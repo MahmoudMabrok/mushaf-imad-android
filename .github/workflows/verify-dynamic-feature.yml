@@ -1,0 +1,70 @@
+name: Verify Dynamic Feature is On-Demand
+
+on:
+  push:
+    branches: [ feature/dynamic-module-support, main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  verify-on-demand:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Build sample AAB
+        run: ./gradlew :sample:bundleRelease --no-daemon
+
+      - name: Analyze AAB module sizes
+        run: |
+          set -e
+          AAB=$(find sample/build/outputs/bundle/release -name "*.aab" | head -1)
+          echo "AAB: $AAB"
+          mkdir -p /tmp/aab
+          unzip -q "$AAB" -d /tmp/aab
+
+          echo "=== Module sizes ==="
+          du -sh /tmp/aab/* || true
+
+          BASE_SIZE=$(du -sm /tmp/aab/base | cut -f1)
+          echo "Base size (MB): $BASE_SIZE"
+
+          if [ -d /tmp/aab/mushaf-feature ]; then
+            FEATURE_SIZE=$(du -sm /tmp/aab/mushaf-feature | cut -f1)
+            echo "mushaf-feature size (MB): $FEATURE_SIZE"
+          else
+            echo "ERROR: mushaf-feature module not found in AAB"
+            exit 1
+          fi
+
+          # Fail if base is unexpectedly large (feature fused into base)
+          # Adjust threshold if your base legitimately grows.
+          if [ "$BASE_SIZE" -gt 80 ]; then
+            echo "ERROR: Base module is ${BASE_SIZE}MB — dynamic feature appears fused into base"
+            exit 1
+          fi
+
+          # Feature should be substantial (contains the Quran assets)
+          if [ "$FEATURE_SIZE" -lt 50 ]; then
+            echo "WARNING: Feature module is only ${FEATURE_SIZE}MB — assets may be missing"
+          fi
+
+          echo "OK: Base=${BASE_SIZE}MB, Feature=${FEATURE_SIZE}MB (on-demand)"
+
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sample-release-aab
+          path: sample/build/outputs/bundle/release/*.aab
+          retention-days: 7
