@@ -1,0 +1,79 @@
+name: Verify Asset Pack reduces size
+
+on:
+  push:
+    branches: [ feature/asset-pack-support ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  verify-size:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Build sample AAB
+        run: ./gradlew :sample:bundleRelease --no-daemon
+
+      - name: Analyze sizes (base / feature / asset pack)
+        run: |
+          set -e
+          AAB=$(find sample/build/outputs/bundle/release -name "*.aab" | head -1)
+          echo "AAB: $AAB"
+          mkdir -p /tmp/aab
+          unzip -q "$AAB" -d /tmp/aab
+
+          echo "=== Top-level modules ==="
+          du -sh /tmp/aab/* || true
+
+          BASE_MB=$(du -sm /tmp/aab/base 2>/dev/null | cut -f1 || echo 0)
+          echo "Base (MB): $BASE_MB"
+
+          FEATURE_MB=0
+          if [ -d /tmp/aab/mushaf-feature ]; then
+            FEATURE_MB=$(du -sm /tmp/aab/mushaf-feature | cut -f1)
+            echo "mushaf-feature (MB): $FEATURE_MB"
+          else
+            echo "mushaf-feature not present"
+          fi
+
+          # Look for asset pack (name may vary)
+          PACK_DIR=$(find /tmp/aab -maxdepth 2 -type d -name "*mushaf*asset*" -o -name "asset-pack*" | head -1 || true)
+          if [ -n "$PACK_DIR" ]; then
+            PACK_MB=$(du -sm "$PACK_DIR" | cut -f1)
+            echo "Asset pack dir: $PACK_DIR ($PACK_MB MB)"
+          else
+            echo "No asset pack directory found in AAB (images may still be inside feature/base)"
+          fi
+
+          # Fail if feature module is still huge (images not moved)
+          if [ "$FEATURE_MB" -gt 100 ]; then
+            echo "ERROR: Feature module is ${FEATURE_MB}MB — Quran images appear still bundled inside it"
+            exit 1
+          fi
+
+          # Fail if base is unexpectedly large
+          if [ "$BASE_MB" -gt 80 ]; then
+            echo "ERROR: Base is ${BASE_MB}MB — unexpected size"
+            exit 1
+          fi
+
+          echo "OK: Base=${BASE_MB}MB, Feature=${FEATURE_MB}MB"
+
+      - name: Upload AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: sample-aab-asset-pack
+          path: sample/build/outputs/bundle/release/*.aab
+          retention-days: 7
