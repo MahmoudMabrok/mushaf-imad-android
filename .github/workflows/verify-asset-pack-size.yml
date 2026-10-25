@@ -44,11 +44,11 @@ jobs:
           echo "Base (MB): $BASE_MB"
 
           FEATURE_MB=0
-          if [ -d /tmp/aab/mushaf-feature ]; then
-            FEATURE_MB=$(du -sm /tmp/aab/mushaf-feature | cut -f1)
-            echo "mushaf-feature (MB): $FEATURE_MB"
+          if [ -d /tmp/aab/mushaf_feature ]; then
+            FEATURE_MB=$(du -sm /tmp/aab/mushaf_feature | cut -f1)
+            echo "mushaf_feature (MB): $FEATURE_MB"
           else
-            echo "mushaf-feature not present"
+            echo "mushaf_feature not present"
           fi
 
           # Look for asset pack (name may vary)
