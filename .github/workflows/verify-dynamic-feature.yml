@@ -36,11 +36,11 @@ jobs:
           BASE_SIZE=$(du -sm /tmp/aab/base | cut -f1)
           echo "Base size (MB): $BASE_SIZE"
 
-          if [ -d /tmp/aab/mushaf-feature ]; then
-            FEATURE_SIZE=$(du -sm /tmp/aab/mushaf-feature | cut -f1)
-            echo "mushaf-feature size (MB): $FEATURE_SIZE"
+          if [ -d /tmp/aab/mushaf_feature ]; then
+            FEATURE_SIZE=$(du -sm /tmp/aab/mushaf_feature | cut -f1)
+            echo "mushaf_feature size (MB): $FEATURE_SIZE"
           else
-            echo "ERROR: mushaf-feature module not found in AAB"
+            echo "ERROR: mushaf_feature module not found in AAB"
             exit 1
           fi
 
