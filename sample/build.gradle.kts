@@ -18,7 +18,7 @@ android {
     }
 
     // On-demand dynamic feature that contains the Mushaf UI
-    dynamicFeatures += setOf(":mushaf-feature")
+    dynamicFeatures += setOf(":mushaf_feature")
 
     buildTypes {
         debug {
