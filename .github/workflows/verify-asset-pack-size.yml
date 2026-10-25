@@ -73,10 +73,3 @@ jobs:
           fi
 
           echo "OK: Base=${BASE_MB}MB, Feature=${FEATURE_MB}MB"
-
-      - name: Upload AAB
-        uses: actions/upload-artifact@v4
-        with:
-          name: sample-aab-asset-pack
-          path: sample/build/outputs/bundle/release/*.aab
-          retention-days: 7
