@@ -10,6 +10,20 @@ The library ships with ~100MB+ of Quran page images + Realm database. Putting it
 - Users who never open the Mushaf never download the assets
 - Updates to the base app stay small
 
+## Ready-to-copy sample
+
+A complete example lives in the `:mushaf-feature` module of this repository.
+
+You can:
+- Copy the `mushaf-feature/` folder into your project, **or**
+- Use it as a reference for the exact `build.gradle.kts` and `AndroidManifest.xml` you need.
+
+The sample app (`:sample`) already declares it:
+
+```kotlin
+dynamicFeatures += setOf(":mushaf-feature")
+```
+
 ## Minimal Setup (3 steps)
 
 ### 1. Create a dynamic feature module
@@ -108,4 +122,5 @@ Once the module is installed, you can use `MushafView` / `MushafWithPlayerView` 
 
 ## Example
 
-See the `sample` module in this repository for a full working app. You can also look at how the feature is wired in real projects that use this library.
+- `:mushaf-feature` — ready-to-copy on-demand module with a simple `MushafFeatureActivity`.
+- `:sample` — the base app that declares the feature.
