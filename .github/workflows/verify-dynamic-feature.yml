@@ -1,10 +1,6 @@
 name: Verify Dynamic Feature is On-Demand
 
 on:
-  push:
-    branches: [ feature/dynamic-module-support, main ]
-  pull_request:
-    branches: [ main ]
   workflow_dispatch:
 
 jobs:
@@ -61,10 +57,3 @@ jobs:
           fi
 
           echo "OK: Base=${BASE_SIZE}MB, Feature=${FEATURE_SIZE}MB (on-demand)"
-
-      - name: Upload AAB artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: sample-release-aab
-          path: sample/build/outputs/bundle/release/*.aab
-          retention-days: 7
