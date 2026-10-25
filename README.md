@@ -2,7 +2,7 @@
 
 A Quran reader library for Android providing high-quality Mushaf page display with audio recitation support.
 
-> **On-demand / smaller base APK?** See [Using as Dynamic Feature](docs/DYNAMIC_FEATURE.md) for the minimal steps to ship the library as a Play Feature Delivery on-demand module.
+> **On-demand / smaller base APK?** See [Delivery Modes Comparison](docs/DELIVERY_COMPARISON.md) and [Using as Dynamic Feature](docs/DYNAMIC_FEATURE.md).
 
 [![Android](https://img.shields.io/badge/Platform-Android-green.svg)](https://android.com)
 [![API](https://img.shields.io/badge/API-24%2B-brightgreen.svg)](https://android-arsenal.com/api?level=24)
@@ -117,11 +117,22 @@ class MyApplication : Application() {
 
 ---
 
-## On-Demand Dynamic Feature
+## Delivery Modes (size & maintainability)
 
-To keep the base APK small, you can ship the library as a Play Feature Delivery **on-demand** module. New users only download the Mushaf when they open it.
+Choose how the Mushaf is delivered. Each option has different size and update characteristics.
 
-See the full minimal guide: [docs/DYNAMIC_FEATURE.md](docs/DYNAMIC_FEATURE.md)
+| Mode | Base size | Update size | Maintainability |
+|------|-----------|-------------|-----------------|
+| Library directly | Large | Large | Easiest |
+| Dynamic Feature | Small | Medium | Medium |
+| Asset Pack | Smallest | Smallest | Highest setup |
+
+Full comparison: [docs/DELIVERY_COMPARISON.md](docs/DELIVERY_COMPARISON.md)
+
+- Dynamic Feature guide: [docs/DYNAMIC_FEATURE.md](docs/DYNAMIC_FEATURE.md)
+- Asset Pack guide: [docs/ASSET_PACK.md](docs/ASSET_PACK.md)
+
+The sample app has a **Delivery Modes** screen that demonstrates all three.
 
 ---
 
@@ -376,11 +387,16 @@ mushaf-ui/                      # Jetpack Compose UI (depends on mushaf-core)
 
 ## Sample App
 
-A sample app is included in the `sample/` module demonstrating all library features:
+A sample app is included in the `sample/` module demonstrating all library features, including the three delivery modes:
 
 ```bash
 ./gradlew :sample:installDebug
 ```
+
+Open **Delivery Modes Demo** from the home screen to compare:
+1. Library directly (bundled)
+2. Dynamic Feature
+3. Asset Pack
 
 ---
 
