@@ -17,6 +17,9 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // On-demand dynamic feature that contains the Mushaf UI
+    dynamicFeatures += setOf(":mushaf-feature")
+
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
@@ -52,7 +55,9 @@ android {
 }
 
 dependencies {
-    // Mushaf UI module (includes mushaf-core transitively)
+    // Note: mushaf-ui is now pulled in via the dynamic feature module.
+    // Keep a compileOnly or implementation only if the base module needs types from it.
+    // For this sample we still depend on it directly for simplicity of the demo screens.
     implementation(project(":mushaf-ui"))
 
     // Kotlin
