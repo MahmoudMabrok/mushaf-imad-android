@@ -58,7 +58,7 @@ fun QuranLineImageView(
     val originalHeight = 232f
     val imageAspect = originalWidth / originalHeight
 
-    // Load image from assets
+    // Load image from assets (prefers Asset Pack when available)
     LaunchedEffect(page, line) {
         imageBitmap = loadLineImage(context, page, line)
     }
@@ -176,22 +176,13 @@ fun QuranLineImageView(
 }
 
 /**
- * Load line image from assets
- * Path: assets/quran-images/{page}/{line}.png
+ * Load line image. Prefers the on-demand Asset Pack when installed,
+ * otherwise falls back to bundled assets.
  */
 private suspend fun loadLineImage(
     context: Context,
     page: Int,
     line: Int
 ): androidx.compose.ui.graphics.ImageBitmap? = withContext(Dispatchers.IO) {
-    try {
-        val assetPath = "quran-images/$page/$line.png"
-        val inputStream: InputStream = context.assets.open(assetPath)
-        val bitmap = BitmapFactory.decodeStream(inputStream)
-        inputStream.close()
-        bitmap?.asImageBitmap()
-    } catch (e: Exception) {
-        println("QuranLineImageView: Failed to load image for page $page line $line: ${e.message}")
-        null
-    }
+    LineImageSource.load(context, page, line)?.asImageBitmap()
 }
