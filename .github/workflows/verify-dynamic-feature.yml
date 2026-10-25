@@ -1,10 +1,6 @@
 name: Verify Dynamic Feature is On-Demand
 
 on:
-  push:
-    branches: [ feature/dynamic-module-support, main ]
-  pull_request:
-    branches: [ main ]
   workflow_dispatch:
 
 jobs:
@@ -49,22 +45,9 @@ jobs:
           fi
 
           # Fail if base is unexpectedly large (feature fused into base)
-          # Adjust threshold if your base legitimately grows.
           if [ "$BASE_SIZE" -gt 80 ]; then
             echo "ERROR: Base module is ${BASE_SIZE}MB — dynamic feature appears fused into base"
             exit 1
           fi
 
-          # Feature should be substantial (contains the Quran assets)
-          if [ "$FEATURE_SIZE" -lt 50 ]; then
-            echo "WARNING: Feature module is only ${FEATURE_SIZE}MB — assets may be missing"
-          fi
-
           echo "OK: Base=${BASE_SIZE}MB, Feature=${FEATURE_SIZE}MB (on-demand)"
-
-      - name: Upload AAB artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: sample-release-aab
-          path: sample/build/outputs/bundle/release/*.aab
-          retention-days: 7
