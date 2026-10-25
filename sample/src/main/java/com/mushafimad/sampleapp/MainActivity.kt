@@ -335,7 +335,7 @@ fun HomeScreen(navController: NavHostController) {
                     item = DemoItem(
                         title = "Delivery Modes Demo",
                         subtitle = "Direct / Dynamic Feature / Asset Pack",
-                        icon = Icons.Default.Download,
+                        icon = Icons.Default.Info,
                         route = Screen.DeliveryHome.route
                     ),
                     onClick = { navController.navigate(Screen.DeliveryHome.route) }
