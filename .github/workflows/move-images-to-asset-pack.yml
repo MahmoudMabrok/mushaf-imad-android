@@ -1,0 +1,41 @@
+name: Move Quran images to Asset Pack
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  move-images:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: feature/asset-pack-support
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Move quran-images into asset pack
+        run: |
+          set -e
+          mkdir -p mushaf-assets/src/main/assets
+          if [ -d mushaf-core/src/main/assets/quran-images ]; then
+            git mv mushaf-core/src/main/assets/quran-images mushaf-assets/src/main/assets/
+            echo "Moved quran-images to asset pack"
+          else
+            echo "quran-images already moved or not found"
+          fi
+
+      - name: Commit and push
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Move Quran images to on-demand Asset Pack"
+            git push origin feature/asset-pack-support
+          fi
