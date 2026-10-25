@@ -2,6 +2,8 @@
 
 A Quran reader library for Android providing high-quality Mushaf page display with audio recitation support.
 
+> **On-demand / smaller base APK?** See [Using as Dynamic Feature](docs/DYNAMIC_FEATURE.md) for the minimal steps to ship the library as a Play Feature Delivery on-demand module.
+
 [![Android](https://img.shields.io/badge/Platform-Android-green.svg)](https://android.com)
 [![API](https://img.shields.io/badge/API-24%2B-brightgreen.svg)](https://android-arsenal.com/api?level=24)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.25-blue.svg)](https://kotlinlang.org)
@@ -112,6 +114,14 @@ class MyApplication : Application() {
     </application>
 </manifest>
 ```
+
+---
+
+## On-Demand Dynamic Feature
+
+To keep the base APK small, you can ship the library as a Play Feature Delivery **on-demand** module. New users only download the Mushaf when they open it.
+
+See the full minimal guide: [docs/DYNAMIC_FEATURE.md](docs/DYNAMIC_FEATURE.md)
 
 ---
 
