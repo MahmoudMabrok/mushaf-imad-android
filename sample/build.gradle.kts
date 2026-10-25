@@ -20,6 +20,9 @@ android {
     // On-demand dynamic feature that contains the Mushaf UI
     dynamicFeatures += setOf(":mushaf_feature")
 
+    // On-demand Asset Pack for Quran images
+    assetPacks += setOf(":mushaf-assets")
+
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
