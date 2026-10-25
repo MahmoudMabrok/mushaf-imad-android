@@ -69,6 +69,9 @@ dependencies {
     // Core module (transitively exposes mushaf-core to consumers)
     api(project(":mushaf-core"))
 
+    // Play Asset Delivery (optional path for large Quran images)
+    implementation("com.google.android.play:asset-delivery:2.2.2")
+
     // Kotlin
     implementation(libs.kotlin.stdlib)
     implementation(libs.kotlinx.coroutines.android)
