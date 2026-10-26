@@ -30,7 +30,7 @@ android {
 }
 
 dependencies {
-    implementation(project(":sample")) // base module
+    implementation(project(":sample-delivery")) // base module for delivery demo
     implementation(project(":mushaf-ui"))
 
     implementation(libs.androidx.core.ktx)
