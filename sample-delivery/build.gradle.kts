@@ -53,7 +53,7 @@ android {
 }
 
 dependencies {
-    implementation(project(":mushaf-ui"))
+    // Base does not depend on mushaf-ui. The dynamic feature module pulls it in.
     implementation(libs.kotlin.stdlib)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.core.ktx)
