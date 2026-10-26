@@ -14,6 +14,6 @@
         <activity
             android:name=".MushafFeatureActivity"
             android:exported="false"
-            android:theme="@style/Theme.AppCompat" />
+            android:theme="@style/Theme.MushafImad" />
     </application>
 </manifest>
