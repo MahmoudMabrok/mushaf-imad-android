@@ -116,12 +116,6 @@ sealed class Screen(val route: String) {
     object SearchDemo : Screen("ui_search")
     object ThemeCustomization : Screen("ui_theme")
     object ReciterPickerDemo : Screen("ui_reciter_picker")
-
-    // Delivery modes
-    object DeliveryHome : Screen(DeliveryRoutes.HOME)
-    object DeliveryDirect : Screen(DeliveryRoutes.DIRECT)
-    object DeliveryDynamic : Screen(DeliveryRoutes.DYNAMIC)
-    object DeliveryAssetPack : Screen(DeliveryRoutes.ASSET_PACK)
 }
 
 @Composable
@@ -171,20 +165,6 @@ fun SampleAppContent() {
         }
         composable(Screen.ReciterPickerDemo.route) {
             ReciterPickerDemoScreen(navController = navController)
-        }
-
-        // Delivery modes
-        composable(Screen.DeliveryHome.route) {
-            DeliveryHomeScreen(navController = navController)
-        }
-        composable(Screen.DeliveryDirect.route) {
-            DirectDeliveryScreen(navController = navController)
-        }
-        composable(Screen.DeliveryDynamic.route) {
-            DynamicFeatureDemoScreen(navController = navController)
-        }
-        composable(Screen.DeliveryAssetPack.route) {
-            AssetPackDemoScreen(navController = navController)
         }
     }
 }
@@ -319,26 +299,6 @@ fun HomeScreen(navController: NavHostController) {
                 DemoListItem(
                     item = item,
                     onClick = { navController.navigate(item.route) }
-                )
-            }
-
-            item { Spacer(modifier = Modifier.height(16.dp)) }
-
-            item {
-                SectionHeader(
-                    title = "Delivery Modes",
-                    subtitle = "Compare size & update strategies"
-                )
-            }
-            item {
-                DemoListItem(
-                    item = DemoItem(
-                        title = "Delivery Modes Demo",
-                        subtitle = "Direct / Dynamic Feature / Asset Pack",
-                        icon = Icons.Default.Info,
-                        route = Screen.DeliveryHome.route
-                    ),
-                    onClick = { navController.navigate(Screen.DeliveryHome.route) }
                 )
             }
         }
