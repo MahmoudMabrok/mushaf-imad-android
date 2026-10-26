@@ -16,10 +16,6 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.mushafimad.core.domain.models.MushafType
-import com.mushafimad.ui.mushaf.MushafView
-import com.mushafimad.ui.theme.ColorSchemeType
-import com.mushafimad.ui.theme.ReadingTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -110,6 +106,7 @@ private fun DynamicScreen(navController: androidx.navigation.NavHostController) 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AssetPackScreen(navController: androidx.navigation.NavHostController) {
+    val context = LocalContext.current
     Scaffold(
         topBar = {
             TopAppBar(
@@ -122,20 +119,28 @@ private fun AssetPackScreen(navController: androidx.navigation.NavHostController
             )
         }
     ) { padding ->
-        Column(Modifier.padding(padding)) {
+        Column(
+            Modifier.fillMaxSize().padding(padding).padding(24.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text("Images are delivered via the on-demand Asset Pack.")
+            Spacer(Modifier.height(8.dp))
             Text(
-                "Images load from the on-demand Asset Pack when available.",
-                modifier = Modifier.padding(16.dp)
+                "The feature module loads images from the pack when available.",
+                style = MaterialTheme.typography.bodySmall
             )
-            MushafView(
-                readingTheme = ReadingTheme.COMFORTABLE,
-                colorScheme = ColorSchemeType.DEFAULT,
-                mushafType = MushafType.HAFS_1441,
-                initialPage = 1,
-                showNavigationControls = true,
-                showPageInfo = true,
-                modifier = Modifier.fillMaxSize()
-            )
+            Spacer(Modifier.height(16.dp))
+            Button(onClick = {
+                try {
+                    context.startActivity(
+                        Intent().setClassName(
+                            context.packageName,
+                            "com.mushafimad.feature.MushafFeatureActivity"
+                        )
+                    )
+                } catch (_: Exception) {}
+            }) { Text("Open Mushaf (uses Asset Pack)") }
         }
     }
 }
