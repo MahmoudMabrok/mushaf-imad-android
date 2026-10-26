@@ -16,12 +16,8 @@ import com.mushafimad.ui.mushaf.MushafView
 import com.mushafimad.ui.theme.ColorSchemeType
 import com.mushafimad.ui.theme.ReadingTheme
 
-/**
- * Routes for the delivery-mode demos.
- */
 object DeliveryRoutes {
     const val HOME = "delivery_home"
-    const val DIRECT = "delivery_direct"
     const val DYNAMIC = "delivery_dynamic"
     const val ASSET_PACK = "delivery_asset_pack"
 }
@@ -31,14 +27,7 @@ object DeliveryRoutes {
 fun DeliveryHomeScreen(navController: NavHostController) {
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Delivery Modes") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
-                }
-            )
+            TopAppBar(title = { Text("Delivery Modes Demo") })
         }
     ) { padding ->
         Column(
@@ -49,25 +38,22 @@ fun DeliveryHomeScreen(navController: NavHostController) {
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text("How is the Mushaf delivered?", style = MaterialTheme.typography.headlineSmall)
-            Text("Each option shows a different size / update trade-off.", style = MaterialTheme.typography.bodyMedium)
+            Text(
+                "Choose a delivery strategy. The library is not used directly in the base APK.",
+                style = MaterialTheme.typography.bodyMedium
+            )
 
             Spacer(Modifier.height(8.dp))
 
             DeliveryCard(
-                title = "1. Library directly",
-                subtitle = "Images + code bundled in the base APK. Simplest integration, largest download.",
-                onClick = { navController.navigate(DeliveryRoutes.DIRECT) }
-            )
-
-            DeliveryCard(
-                title = "2. Dynamic Feature",
-                subtitle = "On-demand module. Base APK stays small. Users download Mushaf only when they open it.",
+                title = "Dynamic Feature (on-demand)",
+                subtitle = "Mushaf UI lives in an on-demand module. Base APK stays small.",
                 onClick = { navController.navigate(DeliveryRoutes.DYNAMIC) }
             )
 
             DeliveryCard(
-                title = "3. Asset Pack",
-                subtitle = "Images in an on-demand Asset Pack. Code stays in a thin module. Smallest updates.",
+                title = "Asset Pack (on-demand)",
+                subtitle = "Images are in an Asset Pack. Code stays thin; updates stay small.",
                 onClick = { navController.navigate(DeliveryRoutes.ASSET_PACK) }
             )
         }
@@ -76,43 +62,11 @@ fun DeliveryHomeScreen(navController: NavHostController) {
 
 @Composable
 private fun DeliveryCard(title: String, subtitle: String, onClick: () -> Unit) {
-    Card(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth()
-    ) {
+    Card(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(4.dp))
             Text(subtitle, style = MaterialTheme.typography.bodySmall)
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun DirectDeliveryScreen(navController: NavHostController) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Direct (bundled)") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
-                }
-            )
-        }
-    ) { padding ->
-        Box(Modifier.padding(padding)) {
-            MushafView(
-                readingTheme = ReadingTheme.COMFORTABLE,
-                colorScheme = ColorSchemeType.DEFAULT,
-                mushafType = MushafType.HAFS_1441,
-                initialPage = 1,
-                showNavigationControls = true,
-                showPageInfo = true,
-                modifier = Modifier.fillMaxSize()
-            )
         }
     }
 }
@@ -142,13 +96,11 @@ fun DynamicFeatureDemoScreen(navController: NavHostController) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                "This mode uses the on-demand :mushaf-feature module.",
+                "This opens the on-demand :mushaf_feature module.",
                 style = MaterialTheme.typography.bodyLarge
             )
             Spacer(Modifier.height(16.dp))
             Button(onClick = {
-                // In a real app you would call SplitInstallManager first.
-                // For the sample we just start the feature Activity (it will fail if the module is not installed).
                 try {
                     val intent = Intent().setClassName(
                         context.packageName,
@@ -156,7 +108,7 @@ fun DynamicFeatureDemoScreen(navController: NavHostController) {
                     )
                     context.startActivity(intent)
                 } catch (_: Exception) {
-                    // Module not installed yet — in production request it via SplitInstallManager
+                    // Module not installed — request it with SplitInstallManager in production
                 }
             }) {
                 Text("Open Mushaf Feature")
@@ -187,8 +139,8 @@ fun AssetPackDemoScreen(navController: NavHostController) {
     ) { padding ->
         Column(Modifier.padding(padding)) {
             Text(
-                "Images are loaded from the on-demand Asset Pack when available.\n" +
-                        "If the pack is not yet downloaded, the library falls back to bundled assets.",
+                "Images load from the on-demand Asset Pack when available.\n" +
+                        "If the pack is not downloaded yet, the library falls back.",
                 modifier = Modifier.padding(16.dp),
                 style = MaterialTheme.typography.bodyMedium
             )
