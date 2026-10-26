@@ -53,7 +53,7 @@ android {
 }
 
 dependencies {
-    // Base does not depend on mushaf-ui. The dynamic feature module pulls it in.
+    // Base only: button + download logic. UI lives in :mushaf_feature.
     implementation(libs.kotlin.stdlib)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.core.ktx)
@@ -66,4 +66,7 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     debugImplementation(libs.androidx.compose.ui.tooling)
     implementation(libs.androidx.navigation.compose)
+
+    // Play Feature Delivery (to request the on-demand module)
+    implementation("com.google.android.play:feature-delivery:2.1.0")
 }
