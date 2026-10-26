@@ -26,13 +26,13 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Build sample AAB
-        run: ./gradlew :sample:bundleRelease --no-daemon
+      - name: Build sample-delivery AAB
+        run: ./gradlew :sample-delivery:bundleRelease --no-daemon
 
       - name: Analyze sizes (base / feature / asset pack)
         run: |
           set -e
-          AAB=$(find sample/build/outputs/bundle/release -name "*.aab" | head -1)
+          AAB=$(find sample-delivery/build/outputs/bundle/release -name "*.aab" | head -1)
           echo "AAB: $AAB"
           mkdir -p /tmp/aab
           unzip -q "$AAB" -d /tmp/aab
