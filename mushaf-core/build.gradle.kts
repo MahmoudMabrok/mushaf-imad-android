@@ -43,7 +43,7 @@ android {
 
     buildFeatures {
         buildConfig = true
-        compose = false  // CRITICAL: No Compose in core module
+        compose = false
     }
 
     packaging {
@@ -61,39 +61,23 @@ android {
 }
 
 dependencies {
-    // Kotlin
     implementation(libs.kotlin.stdlib)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.core)
-
-    // AndroidX Core (NO Compose)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
-
-    // Lifecycle (ViewModel may be used in core for future features)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
-
-    // Realm (Database)
     implementation(libs.realm.library.base)
-
-    // Media3 (Audio Playback)
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.session)
     implementation(libs.media3.common)
-
-    // JSON Parsing
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.gson)
-
-    // DataStore (Preferences)
     implementation(libs.androidx.datastore.preferences)
-
-    // Koin DI
     api(libs.koin.core)
     api(libs.koin.android)
 
-    // Testing
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
     testImplementation(libs.kotlinx.coroutines.test)
@@ -112,6 +96,16 @@ afterEvaluate {
                 groupId = property("GROUP").toString()
                 artifactId = "mushaf-core"
                 version = property("VERSION_NAME").toString()
+            }
+        }
+        repositories {
+            maven {
+                name = "GitHubPackages"
+                url = uri("https://maven.pkg.github.com/MahmoudMabrok/mushaf-imad-android")
+                credentials {
+                    username = System.getenv("GITHUB_ACTOR") ?: ""
+                    password = System.getenv("GITHUB_TOKEN") ?: ""
+                }
             }
         }
     }
