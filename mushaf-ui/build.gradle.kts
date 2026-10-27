@@ -66,26 +66,16 @@ android {
 }
 
 dependencies {
-    // Core module (transitively exposes mushaf-core to consumers)
     api(project(":mushaf-core"))
-
-    // Play Asset Delivery (optional path for large Quran images)
     implementation("com.google.android.play:asset-delivery:2.2.2")
-
-    // Kotlin
     implementation(libs.kotlin.stdlib)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.core)
-
-    // AndroidX Core
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
-
-    // Lifecycle
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
 
-    // Compose
     val composeBom = platform(libs.androidx.compose.bom)
     implementation(composeBom)
     implementation(libs.androidx.compose.ui)
@@ -98,13 +88,9 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
-    // Koin Compose
     implementation(libs.koin.androidx.compose)
-
-    // Coil (Image loading for Compose)
     implementation(libs.coil.compose)
 
-    // Testing
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
     androidTestImplementation(libs.androidx.test.ext.junit)
@@ -121,6 +107,16 @@ afterEvaluate {
                 groupId = property("GROUP").toString()
                 artifactId = "mushaf-ui"
                 version = property("VERSION_NAME").toString()
+            }
+        }
+        repositories {
+            maven {
+                name = "GitHubPackages"
+                url = uri("https://maven.pkg.github.com/MahmoudMabrok/mushaf-imad-android")
+                credentials {
+                    username = System.getenv("GITHUB_ACTOR") ?: ""
+                    password = System.getenv("GITHUB_TOKEN") ?: ""
+                }
             }
         }
     }
