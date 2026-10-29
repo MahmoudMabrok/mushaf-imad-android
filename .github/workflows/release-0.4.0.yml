@@ -1,0 +1,101 @@
+name: Build and release 0.4.0 (asset-pack ready)
+
+# One-shot helper. Builds mushaf-imad-android 0.4.0 = upstream YahiaRagae 0.3.0
+# + .release-0.4.0/mushaf-0.4.0.patch (pluggable LineImageSource, page images moved
+# to the optional mushaf-images artifact, Koin 4), runs the gates, then pushes
+# branch release/0.4.0 + tag 0.4.0 and asks JitPack to build it.
+on:
+  push:
+    branches: [ci/release-0.4.0]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-0.4.0
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Assemble 0.4.0 tree on top of this branch
+        run: |
+          set -euxo pipefail
+          git config user.name "Mahmoud Mabrok Fouad"
+          git config user.email "mahmoudmabrok3579@gmail.com"
+          HELPER=$(git rev-parse HEAD)
+          echo "HELPER=$HELPER" >> "$GITHUB_ENV"
+          cp .release-0.4.0/mushaf-0.4.0.patch "$RUNNER_TEMP/p.patch"
+          git fetch --no-tags https://github.com/YahiaRagae/mushaf-imad-android.git +refs/tags/0.3.0:refs/tags/up-0.3.0
+          # Worktree + index = upstream 0.3.0, but keep this repo's .github unchanged
+          # (GITHUB_TOKEN may not modify workflow files).
+          git read-tree -u --reset up-0.3.0
+          git rm -rq --cached .github || true
+          rm -rf .github
+          git checkout "$HELPER" -- .github
+          mkdir -p mushaf-images/src/main/assets
+          git mv mushaf-core/src/main/assets/quran-images mushaf-images/src/main/assets/quran-images
+          git apply --index "$RUNNER_TEMP/p.patch"
+          git status --short | grep -v '^R ' || true
+          grep -E '^(GROUP|VERSION_NAME)=' gradle.properties
+
+      - uses: gradle/actions/setup-gradle@v5
+
+      - name: Gates - API, unit tests, publish, AAR contents, minified app
+        run: |
+          set -euxo pipefail
+          ./gradlew apiCheck testDebugUnitTest :app:testSourceDebugUnitTest
+          ./gradlew :mushaf-core:publishToMavenLocal :mushaf-ui:publishToMavenLocal :mushaf-images:publishToMavenLocal -x lint
+          bash scripts/verify-aar.sh
+          ls -la ~/.m2/repository/com/github/MahmoudMabrok/mushaf-imad-android/*/0.4.0/
+          ./gradlew :app:assembleSourceRelease -x lint
+
+      - name: Commit, push release/0.4.0 and tag 0.4.0
+        run: |
+          set -euxo pipefail
+          git commit -q -m "feat: pluggable LineImageSource, page images in optional mushaf-images, Koin 4 (0.4.0)
+
+          Based on YahiaRagae/mushaf-imad-android 0.3.0.
+          - mushaf-ui: public LineImageSource (AssetLineImageSource, FileLineImageSource,
+            FallbackLineImageSource) via MushafLineImages.source; default reads
+            assets/quran-images, which also covers Play Asset Delivery install-time packs.
+          - 9060 page PNGs (~113 MB) moved from mushaf-core to new :mushaf-images artifact;
+            mushaf-core AAR ~105 MB -> ~5 MB.
+          - Koin 3.5.6 -> 4.0.0 (ViewModel DSL from org.koin.core.module.dsl).
+          - GROUP com.github.MahmoudMabrok.mushaf-imad-android; jitpack.yml publishes
+            mushaf-images; verify-aar asserts core ships no images."
+          git push origin HEAD:refs/heads/release/0.4.0
+          git tag -a 0.4.0 -m "0.4.0"
+          git push origin refs/tags/0.4.0
+
+      - name: Ask JitPack to build 0.4.0 and wait
+        run: |
+          set -uo pipefail
+          BASE="https://jitpack.io/com/github/MahmoudMabrok/mushaf-imad-android"
+          for i in $(seq 1 40); do
+            ok=1
+            for m in mushaf-ui mushaf-core mushaf-images; do
+              code=$(curl -s -o /dev/null -w '%{http_code}' -m 300 "$BASE/$m/0.4.0/$m-0.4.0.pom")
+              echo "try $i $m pom -> $code"
+              [ "$code" = "200" ] || ok=0
+            done
+            [ $ok = 1 ] && break
+            sleep 30
+          done
+          curl -s -m 120 "$BASE/0.4.0/build.log" | tail -60
+          [ $ok = 1 ] || { echo "::error::JitPack did not publish 0.4.0"; exit 1; }
+          for m in mushaf-ui mushaf-core mushaf-images; do
+            curl -sI -m 300 "$BASE/$m/0.4.0/$m-0.4.0.aar" | grep -iE '^(HTTP|content-length)'
+          done

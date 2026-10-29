@@ -1,0 +1,587 @@
+diff --git a/.gitignore b/.gitignore
+index e1cce07..b175f59 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -17,3 +17,4 @@ local.properties
+ # Android Studio creates a nested .idea/ inside each module (e.g. app/.idea/).
+ # Unanchored so it matches at any depth, not just the repo root.
+ .idea/
++.kotlin/
+diff --git a/README.md b/README.md
+index bdc6bdb..e0c586c 100644
+--- a/README.md
++++ b/README.md
+@@ -59,14 +59,16 @@ Then add the dependency in your app's `build.gradle.kts`:
+ **Option A: Full library (UI + Data) — recommended**
+ ```kotlin
+ dependencies {
+-    implementation("com.github.YahiaRagae.mushaf-imad-android:mushaf-ui:0.3.0")
++    implementation("com.github.MahmoudMabrok.mushaf-imad-android:mushaf-ui:0.4.0")
++    // Page images (optional since 0.4.0 - or ship them in a Play asset pack, see below)
++    implementation("com.github.MahmoudMabrok.mushaf-imad-android:mushaf-images:0.4.0")
+ }
+ ```
+ 
+ **Option B: Data layer only (custom UI)**
+ ```kotlin
+ dependencies {
+-    implementation("com.github.YahiaRagae.mushaf-imad-android:mushaf-core:0.3.0")
++    implementation("com.github.MahmoudMabrok.mushaf-imad-android:mushaf-core:0.4.0")
+ }
+ ```
+ 
+@@ -424,6 +426,39 @@ in two product flavours against two different spellings of the same library:
+ 
+ ---
+ 
++## What's new in 0.4.0 (MahmoudMabrok fork)
++
++### Page images are no longer inside `mushaf-core`
++
++The ~113 MB of line images (`quran-images/{page}/{line}.png`) moved out of the
++`mushaf-core` AAR (now ~5 MB) into an optional `mushaf-images` artifact, and line
++loading goes through a pluggable `LineImageSource`:
++
++```kotlin
++// Default - reads assets/quran-images/ from the app's AssetManager. Works with:
++//  * the optional mushaf-images artifact
++//  * a Play Asset Delivery pack with deliveryType "install-time" (merged into AssetManager)
++MushafLineImages.source = AssetLineImageSource()
++
++// fast-follow / on-demand pack, or any downloaded folder containing {page}/{line}.png
++MushafLineImages.source = FallbackLineImageSource(
++    AssetLineImageSource(),
++    FileLineImageSource(File(packLocation.assetsPath(), "quran-images")),
++)
++```
++
++Shipping the images in an install-time asset pack keeps them out of the base
++module, so regular app updates no longer re-download them.
++
++**Migration:** if you relied on the images being bundled, add the
++`mushaf-images` dependency. Nothing else changes.
++
++### Koin 4
++
++The library now builds against Koin 4.0.0 (ViewModel DSL from
++`org.koin.core.module.dsl`), matching apps on Koin 4 and avoiding R8/runtime
++`GetViewModelKt` mismatches.
++
+ ## What's new in 0.2.2
+ 
+ Two crashes that only ever hit **consumers of the published library** — never the bundled
+diff --git a/app/build.gradle.kts b/app/build.gradle.kts
+index 45df19f..94f72e0 100644
+--- a/app/build.gradle.kts
++++ b/app/build.gradle.kts
+@@ -119,7 +119,12 @@ dependencies {
+     // The library, two ways. Nothing else in this file may differ between the
+     // flavours - the whole point is that the app code cannot tell them apart.
+     "sourceImplementation"(project(":mushaf-ui"))
+-    "publishedImplementation"("com.github.YahiaRagae.mushaf-imad-android:mushaf-ui:$mushafVersion")
++    "publishedImplementation"("com.github.MahmoudMabrok.mushaf-imad-android:mushaf-ui:$mushafVersion")
++
++    // Page images are no longer inside mushaf-core (0.4.0+). This demo app bundles them
++    // with the optional artifact; real apps can use an install-time asset pack instead.
++    "sourceImplementation"(project(":mushaf-images"))
++    "publishedImplementation"("com.github.MahmoudMabrok.mushaf-imad-android:mushaf-images:$mushafVersion")
+ 
+     implementation(libs.kotlin.stdlib)
+     implementation(libs.kotlinx.coroutines.android)
+diff --git a/build.gradle.kts b/build.gradle.kts
+index 2edb3d9..fbddd3a 100644
+--- a/build.gradle.kts
++++ b/build.gradle.kts
+@@ -15,7 +15,7 @@ plugins {
+ // surface consumers depend on. Run `apiDump` to regenerate after an
+ // intentional (additive-only) change; CI runs `apiCheck`.
+ apiValidation {
+-    ignoredProjects += listOf("app")
++    ignoredProjects += listOf("app", "mushaf-images")
+ }
+ 
+ tasks.register("clean", Delete::class) {
+diff --git a/gradle.properties b/gradle.properties
+index e85893f..e14ffe0 100644
+--- a/gradle.properties
++++ b/gradle.properties
+@@ -23,6 +23,6 @@ kotlin.code.style=official
+ android.nonTransitiveRClass=true
+ 
+ # Library versioning
+-VERSION_NAME=0.3.0
+-VERSION_CODE=7
+-GROUP=com.github.YahiaRagae.mushaf-imad-android
+\ No newline at end of file
++VERSION_NAME=0.4.0
++VERSION_CODE=8
++GROUP=com.github.MahmoudMabrok.mushaf-imad-android
+\ No newline at end of file
+diff --git a/gradle/libs.versions.toml b/gradle/libs.versions.toml
+index 4c40976..c029abd 100644
+--- a/gradle/libs.versions.toml
++++ b/gradle/libs.versions.toml
+@@ -35,7 +35,7 @@ hilt = "2.54"
+ hiltNavigationCompose = "1.2.0"
+ 
+ # Koin
+-koin = "3.5.6"
++koin = "4.0.0"
+ 
+ # Realm - 3.0.0 is the final release of the (now deprecated) SDK and the first
+ # to ship 16 KB page-aligned native libraries. It requires Kotlin >= 2.0.20.
+diff --git a/jitpack.yml b/jitpack.yml
+index 20db18d..b06566d 100644
+--- a/jitpack.yml
++++ b/jitpack.yml
+@@ -5,4 +5,4 @@ install:
+   # whatever else it needs. The previous `before_install: sdk-manager ...` line
+   # never ran at all ("sdk-manager: command not found") and only cluttered the
+   # build log with a failure that looked like the cause of real errors.
+-  - ./gradlew :mushaf-core:publishToMavenLocal :mushaf-ui:publishToMavenLocal -x lint
++  - ./gradlew :mushaf-core:publishToMavenLocal :mushaf-ui:publishToMavenLocal :mushaf-images:publishToMavenLocal -x lint
+diff --git a/mushaf-images/build.gradle.kts b/mushaf-images/build.gradle.kts
+new file mode 100644
+index 0000000..184ce80
+--- /dev/null
++++ b/mushaf-images/build.gradle.kts
+@@ -0,0 +1,44 @@
++// Optional artifact: the Mushaf page line images (assets/quran-images/{page}/{line}.png,
++// ~113 MB). Since 0.4.0 they are NOT inside mushaf-core, so apps can deliver them with
++// Play Asset Delivery (install-time pack) instead and keep app updates small.
++// Add this artifact only if you want the images bundled in your APK/AAB base.
++plugins {
++    alias(libs.plugins.android.library)
++    `maven-publish`
++}
++
++android {
++    namespace = "com.mushafimad.images"
++    compileSdk = libs.versions.compileSdk.get().toInt()
++
++    defaultConfig {
++        minSdk = libs.versions.minSdk.get().toInt()
++    }
++
++    compileOptions {
++        sourceCompatibility = JavaVersion.VERSION_17
++        targetCompatibility = JavaVersion.VERSION_17
++    }
++
++    // PNGs are already compressed - do not let aapt try again.
++    androidResources {
++        noCompress += "png"
++    }
++
++    publishing {
++        singleVariant("release")
++    }
++}
++
++afterEvaluate {
++    publishing {
++        publications {
++            create<MavenPublication>("release") {
++                from(components["release"])
++                groupId = property("GROUP").toString()
++                artifactId = "mushaf-images"
++                version = property("VERSION_NAME").toString()
++            }
++        }
++    }
++}
+diff --git a/mushaf-images/src/main/AndroidManifest.xml b/mushaf-images/src/main/AndroidManifest.xml
+new file mode 100644
+index 0000000..8072ee0
+--- /dev/null
++++ b/mushaf-images/src/main/AndroidManifest.xml
+@@ -0,0 +1,2 @@
++<?xml version="1.0" encoding="utf-8"?>
++<manifest />
+diff --git a/mushaf-ui/api/mushaf-ui.api b/mushaf-ui/api/mushaf-ui.api
+index 12662c6..62d8def 100644
+--- a/mushaf-ui/api/mushaf-ui.api
++++ b/mushaf-ui/api/mushaf-ui.api
+@@ -103,6 +103,19 @@ public final class com/mushafimad/ui/history/StreakInfo {
+ 	public fun toString ()Ljava/lang/String;
+ }
+ 
++public final class com/mushafimad/ui/mushaf/AssetLineImageSource : com/mushafimad/ui/mushaf/LineImageSource {
++	public static final field $stable I
++	public static final field Companion Lcom/mushafimad/ui/mushaf/AssetLineImageSource$Companion;
++	public static final field DEFAULT_ROOT Ljava/lang/String;
++	public fun <init> ()V
++	public fun <init> (Ljava/lang/String;)V
++	public synthetic fun <init> (Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
++	public fun open (Landroid/content/Context;II)Ljava/io/InputStream;
++}
++
++public final class com/mushafimad/ui/mushaf/AssetLineImageSource$Companion {
++}
++
+ public final class com/mushafimad/ui/mushaf/ComposableSingletons$MushafViewKt {
+ 	public static final field INSTANCE Lcom/mushafimad/ui/mushaf/ComposableSingletons$MushafViewKt;
+ 	public static field lambda-1 Lkotlin/jvm/functions/Function3;
+@@ -129,6 +142,33 @@ public final class com/mushafimad/ui/mushaf/ComposableSingletons$VerseFaselKt {
+ 	public final fun getLambda-3$mushaf_ui_release ()Lkotlin/jvm/functions/Function2;
+ }
+ 
++public final class com/mushafimad/ui/mushaf/FallbackLineImageSource : com/mushafimad/ui/mushaf/LineImageSource {
++	public static final field $stable I
++	public fun <init> (Ljava/util/List;)V
++	public fun <init> ([Lcom/mushafimad/ui/mushaf/LineImageSource;)V
++	public fun open (Landroid/content/Context;II)Ljava/io/InputStream;
++}
++
++public final class com/mushafimad/ui/mushaf/FileLineImageSource : com/mushafimad/ui/mushaf/LineImageSource {
++	public static final field $stable I
++	public fun <init> (Ljava/io/File;)V
++	public fun open (Landroid/content/Context;II)Ljava/io/InputStream;
++}
++
++public abstract interface class com/mushafimad/ui/mushaf/LineImageSource {
++	public abstract fun open (Landroid/content/Context;II)Ljava/io/InputStream;
++}
++
++public final class com/mushafimad/ui/mushaf/MushafLineImages {
++	public static final field $stable I
++	public static final field INSTANCE Lcom/mushafimad/ui/mushaf/MushafLineImages;
++	public static final fun getSource ()Lcom/mushafimad/ui/mushaf/LineImageSource;
++	public static final fun isAvailable (Landroid/content/Context;II)Z
++	public static synthetic fun isAvailable$default (Landroid/content/Context;IIILjava/lang/Object;)Z
++	public static final fun load (Landroid/content/Context;II)Landroid/graphics/Bitmap;
++	public static final fun setSource (Lcom/mushafimad/ui/mushaf/LineImageSource;)V
++}
++
+ public final class com/mushafimad/ui/mushaf/MushafUiState {
+ 	public static final field $stable I
+ 	public fun <init> ()V
+diff --git a/mushaf-ui/src/main/java/com/mushafimad/ui/di/UiModule.kt b/mushaf-ui/src/main/java/com/mushafimad/ui/di/UiModule.kt
+index c3f058a..6781ef7 100644
+--- a/mushaf-ui/src/main/java/com/mushafimad/ui/di/UiModule.kt
++++ b/mushaf-ui/src/main/java/com/mushafimad/ui/di/UiModule.kt
+@@ -7,7 +7,7 @@ import com.mushafimad.ui.player.QuranPlayerViewModel
+ import com.mushafimad.ui.search.SearchViewModel
+ import com.mushafimad.ui.settings.SettingsViewModel
+ import com.mushafimad.ui.theme.ThemeViewModel
+-import org.koin.androidx.viewmodel.dsl.viewModel
++import org.koin.core.module.dsl.viewModel
+ import org.koin.dsl.module
+ 
+ /**
+diff --git a/mushaf-ui/src/main/java/com/mushafimad/ui/mushaf/LineImageSource.kt b/mushaf-ui/src/main/java/com/mushafimad/ui/mushaf/LineImageSource.kt
+new file mode 100644
+index 0000000..61c91bc
+--- /dev/null
++++ b/mushaf-ui/src/main/java/com/mushafimad/ui/mushaf/LineImageSource.kt
+@@ -0,0 +1,105 @@
++package com.mushafimad.ui.mushaf
++
++import android.content.Context
++import android.graphics.Bitmap
++import android.graphics.BitmapFactory
++import java.io.File
++import java.io.InputStream
++
++/**
++ * Where the Mushaf line images (`{page}/{line}.png`, 1440x232) come from.
++ *
++ * Since 0.4.0 the ~113 MB of page images are no longer packed inside the
++ * `mushaf-core` AAR. A consumer chooses how to ship them:
++ *
++ * - **Optional artifact** - add `mushaf-images` as a dependency. Its assets merge into
++ *   the APK under `assets/quran-images/`, which the default [AssetLineImageSource] reads.
++ * - **Play Asset Delivery, install-time pack** - put `quran-images/` in an asset pack
++ *   module with `deliveryType = "install-time"`. Install-time packs are merged into the
++ *   app's [android.content.res.AssetManager], so the default source reads them too and
++ *   app updates no longer re-download the images.
++ * - **fast-follow / on-demand pack, or a downloaded folder** - set
++ *   `MushafLineImages.source = FileLineImageSource(dir)` where `dir` contains
++ *   `{page}/{line}.png` (e.g. `File(packLocation.assetsPath(), "quran-images")`).
++ * - Anything else - implement [LineImageSource] yourself.
++ */
++fun interface LineImageSource {
++    /**
++     * Open the PNG for [page] (1..604) and [line] (0..14), or return `null` when it is
++     * not available. The caller closes the stream. Called off the main thread.
++     */
++    fun open(context: Context, page: Int, line: Int): InputStream?
++}
++
++/**
++ * Reads `"$root/{page}/{line}.png"` through [Context.getAssets]. Works for images merged from
++ * the `mushaf-images` artifact, the app's own assets, and install-time asset packs.
++ */
++class AssetLineImageSource @JvmOverloads constructor(
++    private val root: String = DEFAULT_ROOT
++) : LineImageSource {
++    override fun open(context: Context, page: Int, line: Int): InputStream? =
++        try {
++            context.assets.open("$root/$page/$line.png")
++        } catch (_: Exception) {
++            null
++        }
++
++    companion object {
++        const val DEFAULT_ROOT: String = "quran-images"
++    }
++}
++
++/** Reads `{dir}/{page}/{line}.png` from the file system. */
++class FileLineImageSource(private val dir: File) : LineImageSource {
++    override fun open(context: Context, page: Int, line: Int): InputStream? {
++        val file = File(dir, "$page/$line.png")
++        return if (file.isFile) file.inputStream() else null
++    }
++}
++
++/** Tries each source in order and returns the first image found. */
++class FallbackLineImageSource(private val sources: List<LineImageSource>) : LineImageSource {
++    constructor(vararg sources: LineImageSource) : this(sources.toList())
++
++    override fun open(context: Context, page: Int, line: Int): InputStream? {
++        for (source in sources) {
++            val stream = try {
++                source.open(context, page, line)
++            } catch (_: Exception) {
++                null
++            }
++            if (stream != null) return stream
++        }
++        return null
++    }
++}
++
++/**
++ * Global configuration of where line images are read from. Set [source] once, e.g. in
++ * `Application.onCreate`, before any Mushaf screen is shown. Defaults to
++ * [AssetLineImageSource] reading `assets/quran-images/`.
++ */
++object MushafLineImages {
++    @Volatile
++    @JvmStatic
++    var source: LineImageSource = AssetLineImageSource()
++
++    /** Loads and decodes one line image with the configured [source]; `null` if missing. */
++    @JvmStatic
++    fun load(context: Context, page: Int, line: Int): Bitmap? =
++        try {
++            source.open(context, page, line)?.use { BitmapFactory.decodeStream(it) }
++        } catch (_: Exception) {
++            null
++        }
++
++    /** True when the configured [source] can provide the given line image. */
++    @JvmStatic
++    fun isAvailable(context: Context, page: Int = 1, line: Int = 0): Boolean =
++        try {
++            source.open(context, page, line)?.use { true } ?: false
++        } catch (_: Exception) {
++            false
++        }
++}
+diff --git a/mushaf-ui/src/main/java/com/mushafimad/ui/mushaf/QuranLineImageView.kt b/mushaf-ui/src/main/java/com/mushafimad/ui/mushaf/QuranLineImageView.kt
+index 4eb29f1..33fa724 100644
+--- a/mushaf-ui/src/main/java/com/mushafimad/ui/mushaf/QuranLineImageView.kt
++++ b/mushaf-ui/src/main/java/com/mushafimad/ui/mushaf/QuranLineImageView.kt
+@@ -1,7 +1,6 @@
+ package com.mushafimad.ui.mushaf
+ 
+ import android.content.Context
+-import android.graphics.BitmapFactory
+ import androidx.compose.foundation.ExperimentalFoundationApi
+ import androidx.compose.foundation.Image
+ import androidx.compose.foundation.background
+@@ -34,13 +33,12 @@ import com.mushafimad.ui.theme.MushafColors
+ import com.mushafimad.ui.theme.readingTheme
+ import kotlinx.coroutines.Dispatchers
+ import kotlinx.coroutines.withContext
+-import java.io.InputStream
+ 
+ /**
+  * Displays a single Quran line image loaded from assets
+  * Matches iOS QuranLineImageView implementation
+  *
+- * Images are stored in assets/quran-images/{page}/{line}.png
++ * Images come from [MushafLineImages.source] (default assets/quran-images/{page}/{line}.png)
+  * Original dimensions: 1440 x 232 pixels
+  * Each page has 15 lines (0-14)
+  */
+@@ -279,22 +277,17 @@ fun QuranLineImageView(
+ }
+ 
+ /**
+- * Load line image from assets
+- * Path: assets/quran-images/{page}/{line}.png
++ * Load line image through [MushafLineImages.source]
++ * (default: assets/quran-images/{page}/{line}.png)
+  */
+ private suspend fun loadLineImage(
+     context: Context,
+     page: Int,
+     line: Int
+ ): androidx.compose.ui.graphics.ImageBitmap? = withContext(Dispatchers.IO) {
+-    try {
+-        val assetPath = "quran-images/$page/$line.png"
+-        val inputStream: InputStream = context.assets.open(assetPath)
+-        val bitmap = BitmapFactory.decodeStream(inputStream)
+-        inputStream.close()
+-        bitmap?.asImageBitmap()
+-    } catch (e: Exception) {
+-        println("QuranLineImageView: Failed to load image for page $page line $line: ${e.message}")
+-        null
++    val bitmap = MushafLineImages.load(context, page, line)
++    if (bitmap == null) {
++        println("QuranLineImageView: no image for page $page line $line from ${MushafLineImages.source}")
+     }
++    bitmap?.asImageBitmap()
+ }
+diff --git a/mushaf-ui/src/test/java/com/mushafimad/ui/mushaf/LineImageSourceTest.kt b/mushaf-ui/src/test/java/com/mushafimad/ui/mushaf/LineImageSourceTest.kt
+new file mode 100644
+index 0000000..d716e74
+--- /dev/null
++++ b/mushaf-ui/src/test/java/com/mushafimad/ui/mushaf/LineImageSourceTest.kt
+@@ -0,0 +1,65 @@
++package com.mushafimad.ui.mushaf
++
++import android.content.Context
++import android.content.res.AssetManager
++import io.mockk.every
++import io.mockk.mockk
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertNull
++import org.junit.Rule
++import org.junit.Test
++import org.junit.rules.TemporaryFolder
++import java.io.ByteArrayInputStream
++import java.io.FileNotFoundException
++
++class LineImageSourceTest {
++
++    @get:Rule
++    val tmp = TemporaryFolder()
++
++    private val context: Context = mockk(relaxed = true)
++
++    @Test
++    fun `file source reads page and line from directory`() {
++        val dir = tmp.newFolder("quran-images")
++        dir.resolve("3").mkdirs()
++        dir.resolve("3/7.png").writeBytes(byteArrayOf(1, 2, 3))
++
++        val source = FileLineImageSource(dir)
++
++        assertEquals(listOf<Byte>(1, 2, 3), source.open(context, 3, 7)!!.use { it.readBytes().toList() })
++        assertNull(source.open(context, 3, 8))
++    }
++
++    @Test
++    fun `asset source opens root slash page slash line png`() {
++        val assets: AssetManager = mockk()
++        every { assets.open("quran-images/1/0.png") } returns ByteArrayInputStream(byteArrayOf(9))
++        every { assets.open("quran-images/1/1.png") } throws FileNotFoundException()
++        every { context.assets } returns assets
++
++        val source = AssetLineImageSource()
++
++        assertEquals(9, source.open(context, 1, 0)!!.use { it.read() })
++        assertNull(source.open(context, 1, 1))
++    }
++
++    @Test
++    fun `fallback source returns first available and survives throwing sources`() {
++        val dir = tmp.newFolder("pack")
++        dir.resolve("2").mkdirs()
++        dir.resolve("2/0.png").writeBytes(byteArrayOf(5))
++
++        val throwing = LineImageSource { _, _, _ -> throw IllegalStateException("boom") }
++        val empty = LineImageSource { _, _, _ -> null }
++        val source = FallbackLineImageSource(throwing, empty, FileLineImageSource(dir))
++
++        assertEquals(5, source.open(context, 2, 0)!!.use { it.read() })
++        assertNull(source.open(context, 2, 1))
++    }
++
++    @Test
++    fun `default global source reads bundled assets`() {
++        assertEquals(AssetLineImageSource::class, MushafLineImages.source::class)
++    }
++}
+diff --git a/scripts/verify-aar.sh b/scripts/verify-aar.sh
+index f23eb51..911b0b9 100755
+--- a/scripts/verify-aar.sh
++++ b/scripts/verify-aar.sh
+@@ -13,7 +13,7 @@
+ #     assets/config a build can silently drop.
+ #
+ # Run after:
+-#   ./gradlew :mushaf-core:publishToMavenLocal :mushaf-ui:publishToMavenLocal -x lint
++#   ./gradlew :mushaf-core:publishToMavenLocal :mushaf-ui:publishToMavenLocal :mushaf-images:publishToMavenLocal -x lint
+ set -euo pipefail
+ 
+ VERSION="$(sed -n 's/^VERSION_NAME=//p' gradle.properties)"
+@@ -23,6 +23,7 @@ REPO="${HOME}/.m2/repository/${GROUP_PATH}"
+ CORE_AAR="${REPO}/mushaf-core/${VERSION}/mushaf-core-${VERSION}.aar"
+ UI_AAR="${REPO}/mushaf-ui/${VERSION}/mushaf-ui-${VERSION}.aar"
+ UI_POM="${REPO}/mushaf-ui/${VERSION}/mushaf-ui-${VERSION}.pom"
++IMAGES_AAR="${REPO}/mushaf-images/${VERSION}/mushaf-images-${VERSION}.aar"
+ 
+ fail() { echo "::error::$1"; exit 1; }
+ ok()   { echo "  ok  $1"; }
+@@ -36,10 +37,10 @@ count()    { printf '%s\n' "$1" | grep -c -- "$2" || true; }
+ 
+ echo "Verifying published artifacts for ${VERSION}"
+ 
+-for f in "$CORE_AAR" "$UI_AAR" "$UI_POM"; do
++for f in "$CORE_AAR" "$UI_AAR" "$UI_POM" "$IMAGES_AAR"; do
+   [ -f "$f" ] || fail "missing artifact: $f"
+ done
+-ok "both AARs and the POM were produced"
++ok "all AARs and the POM were produced"
+ 
+ core_list="$(unzip -l "$CORE_AAR")"
+ 
+@@ -52,9 +53,17 @@ realm_bytes="$(printf '%s\n' "$core_list" | awk '$4 == "assets/quran.realm" { pr
+   || fail "assets/quran.realm is only ${realm_bytes:-0} bytes - it looks truncated"
+ ok "quran.realm present (${realm_bytes} bytes)"
+ 
+-images="$(count "$core_list" "assets/quran-images/")"
+-[ "$images" -gt 9000 ] || fail "only ${images} page images in the AAR - expected ~9665"
+-ok "${images} page images present"
++# Since 0.4.0 the page images live in the optional mushaf-images artifact so apps
++# can deliver them via Play Asset Delivery. mushaf-core must NOT carry them any more
++# (that is what made every consumer update ~150 MB).
++core_images="$(count "$core_list" "assets/quran-images/")"
++[ "$core_images" -eq 0 ] || fail "mushaf-core AAR still contains ${core_images} page images - they belong in mushaf-images"
++ok "mushaf-core carries no page images"
++
++images_list="$(unzip -l "$IMAGES_AAR")"
++images="$(count "$images_list" "assets/quran-images/")"
++[ "$images" -gt 9000 ] || fail "only ${images} page images in mushaf-images - expected ~9665"
++ok "${images} page images present in mushaf-images"
+ 
+ timings="$(count "$core_list" "assets/ayah_timing/read_.*\.json")"
+ [ "$timings" -eq 18 ] || fail "${timings} reciter timing files in the AAR - expected 18"
+diff --git a/settings.gradle.kts b/settings.gradle.kts
+index 64204dd..1d338b2 100644
+--- a/settings.gradle.kts
++++ b/settings.gradle.kts
+@@ -24,10 +24,10 @@ dependencyResolutionManagement {
+         // proof). Both are restricted to the library's own group, so nothing else in
+         // the build can be served from them.
+         mavenLocal {
+-            content { includeGroup("com.github.YahiaRagae.mushaf-imad-android") }
++            content { includeGroup("com.github.MahmoudMabrok.mushaf-imad-android") }
+         }
+         maven("https://jitpack.io") {
+-            content { includeGroup("com.github.YahiaRagae.mushaf-imad-android") }
++            content { includeGroup("com.github.MahmoudMabrok.mushaf-imad-android") }
+         }
+     }
+ }
+@@ -35,4 +35,5 @@ dependencyResolutionManagement {
+ rootProject.name = "MushafImad"
+ include(":mushaf-core")     // Core data layer (no Compose)
+ include(":mushaf-ui")       // UI components (depends on mushaf-core)
++include(":mushaf-images")   // Optional: page line images as assets (not inside mushaf-core since 0.4.0)
+ include(":app")             // The Quran app - builds against the library from source OR from the published artifact
