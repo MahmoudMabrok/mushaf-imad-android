@@ -42,6 +42,7 @@ private const val CUSTOM_COMMAND_TOGGLE_REPEAT = "TOGGLE_REPEAT"
 
 private const val ARG_CHAPTER_NUMBER = "chapter_number"
 private const val ARG_RECITER_ID = "reciter_id"
+private const val ARG_AUTO_PLAY = "auto_play"
 private const val ARG_SPEED = "speed"
 
 /**
@@ -225,9 +226,11 @@ class AudioPlaybackService : MediaSessionService(), KoinComponent {
                 CUSTOM_COMMAND_LOAD_CHAPTER -> {
                     val chapterNumber = args.getInt(ARG_CHAPTER_NUMBER, -1)
                     val reciterId = args.getInt(ARG_RECITER_ID, -1)
+                    // Older callers did not send the flag and expected playback to start.
+                    val autoPlay = args.getBoolean(ARG_AUTO_PLAY, true)
 
                     if (chapterNumber > 0 && reciterId > 0) {
-                        loadChapter(chapterNumber, reciterId)
+                        loadChapter(chapterNumber, reciterId, autoPlay)
                         Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
                     } else {
                         Futures.immediateFuture(SessionResult(SessionError.ERROR_BAD_VALUE))
@@ -269,7 +272,7 @@ class AudioPlaybackService : MediaSessionService(), KoinComponent {
     /**
      * Load and prepare audio for a specific chapter and reciter
      */
-    private fun loadChapter(chapterNumber: Int, reciterId: Int) {
+    private fun loadChapter(chapterNumber: Int, reciterId: Int, autoPlay: Boolean = true) {
         serviceScope.launch {
             try {
                 val reciter = reciterService.getReciterById(reciterId)
@@ -306,9 +309,13 @@ class AudioPlaybackService : MediaSessionService(), KoinComponent {
 
                 player.setMediaItem(mediaItem)
                 player.prepare()
-                player.play()
+                // Respect autoPlay = false: loading a chapter (e.g. when the reader shows a
+                // new surah, or the player bar appears) must not start reciting by itself.
+                if (autoPlay) {
+                    player.play()
+                }
 
-                MushafLibrary.logger.info("Playing: $chapterTitle by $reciterName")
+                MushafLibrary.logger.info("Loaded: $chapterTitle by $reciterName (autoPlay=$autoPlay)")
             } catch (e: Exception) {
                 MushafLibrary.logger.error("Failed to load chapter", e)
             }

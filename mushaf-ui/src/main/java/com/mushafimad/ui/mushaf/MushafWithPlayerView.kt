@@ -82,6 +82,17 @@ fun MushafWithPlayerView(
             }
     }
 
+    // Hiding the player (showAudioPlayer true -> false, e.g. an app's reading/listening
+    // toggle) ends the recitation. Otherwise the audio keeps playing with no controls on
+    // screen, the page keeps following it and the last recited verse stays highlighted.
+    var playerWasShown by remember { mutableStateOf(showAudioPlayer) }
+    LaunchedEffect(showAudioPlayer) {
+        if (playerWasShown && !showAudioPlayer) {
+            playerViewModel.stop()
+        }
+        playerWasShown = showAudioPlayer
+    }
+
     val verses = mushafUiState.verses
     val currentVerseNumber by playerViewModel.currentVerseNumber.collectAsState()
 

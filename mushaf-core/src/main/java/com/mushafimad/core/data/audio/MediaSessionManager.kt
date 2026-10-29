@@ -231,6 +231,7 @@ internal class MediaSessionManager(
             val args = Bundle().apply {
                 putInt("chapter_number", chapterNumber)
                 putInt("reciter_id", reciterId)
+                putBoolean("auto_play", autoPlay)
             }
 
             mediaController?.sendCustomCommand(
