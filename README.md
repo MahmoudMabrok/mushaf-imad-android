@@ -59,16 +59,16 @@ Then add the dependency in your app's `build.gradle.kts`:
 **Option A: Full library (UI + Data) — recommended**
 ```kotlin
 dependencies {
-    implementation("com.github.MahmoudMabrok.mushaf-imad-android:mushaf-ui:0.4.0")
+    implementation("com.github.MahmoudMabrok.mushaf-imad-android:mushaf-ui:0.4.1")
     // Page images (optional since 0.4.0 - or ship them in a Play asset pack, see below)
-    implementation("com.github.MahmoudMabrok.mushaf-imad-android:mushaf-images:0.4.0")
+    implementation("com.github.MahmoudMabrok.mushaf-imad-android:mushaf-images:0.4.1")
 }
 ```
 
 **Option B: Data layer only (custom UI)**
 ```kotlin
 dependencies {
-    implementation("com.github.MahmoudMabrok.mushaf-imad-android:mushaf-core:0.4.0")
+    implementation("com.github.MahmoudMabrok.mushaf-imad-android:mushaf-core:0.4.1")
 }
 ```
 
@@ -425,6 +425,15 @@ in two product flavours against two different spellings of the same library:
 **Status:** Published on [JitPack](https://jitpack.io/#YahiaRagae/mushaf-imad-android)
 
 ---
+
+## What's new in 0.4.1
+
+- `MushafWithPlayerView`: switching `showAudioPlayer` from `true` to `false` now stops the
+  recitation and clears the recited-verse highlight, so an app can offer a
+  reading/listening toggle by flipping that one flag (the current page is kept).
+- Audio: `loadChapter(autoPlay = false)` no longer starts playback. The playback service
+  ignored the flag and always called `play()`, so showing the player (or moving to a new
+  surah while idle) started reciting on its own.
 
 ## What's new in 0.4.0 (MahmoudMabrok fork)
 
