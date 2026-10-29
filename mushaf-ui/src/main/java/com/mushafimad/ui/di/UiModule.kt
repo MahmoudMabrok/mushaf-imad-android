@@ -7,7 +7,7 @@ import com.mushafimad.ui.player.QuranPlayerViewModel
 import com.mushafimad.ui.search.SearchViewModel
 import com.mushafimad.ui.settings.SettingsViewModel
 import com.mushafimad.ui.theme.ThemeViewModel
-import org.koin.androidx.viewmodel.dsl.viewModel
+import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
 
 /**
@@ -26,6 +26,7 @@ val uiModule = module {
         MushafViewModel(
             verseRepository = get(),
             chapterRepository = get(),
+            pageRepository = get(),
             readingHistoryRepository = get(),
             preferencesRepository = get()
         )

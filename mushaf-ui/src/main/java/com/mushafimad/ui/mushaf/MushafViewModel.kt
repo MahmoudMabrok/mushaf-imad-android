@@ -1,9 +1,12 @@
 package com.mushafimad.ui.mushaf
 
+import android.os.SystemClock
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mushafimad.core.domain.models.*
 import com.mushafimad.core.domain.repository.*
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,6 +23,7 @@ import kotlinx.coroutines.launch
 class MushafViewModel(
     private val verseRepository: VerseRepository,
     private val chapterRepository: ChapterRepository,
+    private val pageRepository: PageRepository,
     private val readingHistoryRepository: ReadingHistoryRepository,
     private val preferencesRepository: PreferencesRepository
 ) : ViewModel() {
@@ -27,8 +31,185 @@ class MushafViewModel(
     private val _uiState = MutableStateFlow(MushafUiState())
     val uiState: StateFlow<MushafUiState> = _uiState.asStateFlow()
 
+    // Per-page content for the pager; bounded so swiping through the whole
+    // mushaf can't grow memory without limit
+    private val pageCache = android.util.LruCache<Int, PageContent>(PAGE_CACHE_SIZE)
+
+    // True once the consumer (initialPage) or the user navigated somewhere;
+    // the async last-position restore must not override that
+    private var navigationRequested = false
+
+    private var savePositionJob: Job? = null
+
+    // The page currently being timed for a reading session, and when the reader
+    // arrived on it. Nothing else in the library records sessions, so without
+    // this every reading statistic (total time, streak, chapters read) stays
+    // empty forever.
+    private var timedPage = 0
+    private var timedChapter = 0
+    private var timedVerse = 1
+    private var pageEnteredAtMs = 0L
+
     init {
         loadPreferences()
+    }
+
+    /**
+     * Cache lookup without loading; lets the pager render a neighbouring page
+     * instantly when it was already prefetched.
+     */
+    internal fun peekPageContent(pageNumber: Int): PageContent? = pageCache.get(pageNumber)
+
+    /**
+     * Load (or fetch from cache) the content of a single page without
+     * touching the shared UI state. Used by the pager for off-screen pages.
+     */
+    internal suspend fun pageContent(pageNumber: Int): PageContent? {
+        if (pageNumber < 1 || pageNumber > TOTAL_PAGES) return null
+        pageCache.get(pageNumber)?.let { return it }
+
+        return try {
+            val mushafType = _uiState.value.mushafType
+            val verses = verseRepository.getVersesForPage(pageNumber, mushafType)
+            if (verses.isEmpty()) return null
+
+            val chapters = verses.map { it.chapterNumber }.distinct().mapNotNull { chapterNum ->
+                try {
+                    chapterRepository.getChapter(chapterNum)
+                } catch (e: Exception) {
+                    null
+                }
+            }
+
+            // Real juz (part) and hizb for this page, read from the page data - the same
+            // source iOS uses. Falls back to the page-count approximation only if the
+            // header is unavailable, so the number is never blank.
+            val header = try {
+                pageRepository.getPageHeaderInfo(pageNumber, mushafType)
+            } catch (e: Exception) {
+                null
+            }
+
+            val juz = header?.partNumber ?: calculateJuzNumber(pageNumber)
+            PageContent(
+                verses = verses,
+                chapters = chapters,
+                juzNumber = juz,
+                juzArabic = header?.partArabicTitle ?: "الجزء $juz",
+                juzEnglish = header?.partEnglishTitle ?: "Part $juz",
+                hizbArabic = header?.quarterArabicTitle,
+                hizbEnglish = header?.quarterEnglishTitle,
+                chapterHeaders = runCatching {
+                    pageRepository.getChapterHeaders(pageNumber, mushafType)
+                }.getOrDefault(emptyList()),
+            ).also { pageCache.put(pageNumber, it) }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Commit a page the user swiped to once the pager settles on it.
+     * Unlike [loadPage], never flips isLoading: the pager has already
+     * rendered the page, so a full-screen spinner here would flash.
+     */
+    internal fun onPageSettled(pageNumber: Int) {
+        val state = _uiState.value
+        if (pageNumber == state.currentPage && state.verses.isNotEmpty()) return
+
+        navigationRequested = true
+
+        viewModelScope.launch {
+            val content = pageContent(pageNumber) ?: return@launch
+            _uiState.update {
+                it.copy(
+                    currentPage = pageNumber,
+                    currentChapter = content.verses.first().chapterNumber,
+                    currentVerse = content.verses.first().number,
+                    verses = content.verses,
+                    chapters = content.chapters,
+                    isLoading = false,
+                    error = null
+                )
+            }
+            try {
+                preferencesRepository.setCurrentPage(pageNumber)
+            } catch (e: Exception) {
+                // Silent failure for preference persistence
+            }
+            schedulePositionSave()
+            beginPageTiming(
+                pageNumber = pageNumber,
+                chapterNumber = content.verses.first().chapterNumber,
+                verseNumber = content.verses.first().number
+            )
+        }
+    }
+
+    /**
+     * Start timing a reading session for the page now on screen, closing out
+     * the session for the page the reader just left.
+     */
+    private fun beginPageTiming(pageNumber: Int, chapterNumber: Int, verseNumber: Int) {
+        if (pageNumber == timedPage) return
+
+        flushReadingSession()
+
+        timedPage = pageNumber
+        timedChapter = chapterNumber
+        timedVerse = verseNumber
+        pageEnteredAtMs = SystemClock.elapsedRealtime()
+    }
+
+    /**
+     * Record how long the reader spent on the page currently being timed.
+     *
+     * Called when the page changes and when the reader is dismissed, so that
+     * reading statistics reflect actual reading rather than staying empty.
+     * Pages flicked past in under [MIN_SESSION_SECONDS] are not recorded -
+     * swiping through the mushaf is not reading it.
+     */
+    internal fun flushReadingSession() {
+        val page = timedPage
+        val enteredAt = pageEnteredAtMs
+        if (page <= 0 || enteredAt == 0L) return
+
+        pageEnteredAtMs = 0L
+        timedPage = 0
+
+        val seconds = ((SystemClock.elapsedRealtime() - enteredAt) / 1000L).toInt()
+        if (seconds < MIN_SESSION_SECONDS) return
+
+        val mushafType = _uiState.value.mushafType
+        val chapter = timedChapter
+        val verse = timedVerse
+
+        viewModelScope.launch {
+            try {
+                readingHistoryRepository.recordReadingSession(
+                    chapterNumber = chapter,
+                    verseNumber = verse,
+                    pageNumber = page,
+                    durationSeconds = seconds,
+                    mushafType = mushafType
+                )
+            } catch (e: Exception) {
+                // Statistics are best-effort; never fail a page turn over them
+            }
+        }
+    }
+
+    /**
+     * Persist the reading position shortly after it stabilises. Debounced so
+     * fast consecutive swipes write once; replaces the old 30-second timer,
+     * which lost the position on process death.
+     */
+    private fun schedulePositionSave() {
+        savePositionJob?.cancel()
+        savePositionJob = viewModelScope.launch {
+            delay(SAVE_POSITION_DEBOUNCE_MS)
+            saveReadingPosition()
+        }
     }
 
     /**
@@ -43,6 +224,10 @@ class MushafViewModel(
 
                 // Get last read position
                 val lastPosition = readingHistoryRepository.getLastReadPosition(mushafType)
+
+                // A consumer-provided initialPage (or early user navigation)
+                // takes precedence over the restored position
+                if (navigationRequested) return@launch
 
                 _uiState.update {
                     it.copy(
@@ -68,21 +253,24 @@ class MushafViewModel(
      * Load a specific page
      */
     fun loadPage(pageNumber: Int) {
-        if (pageNumber < 1 || pageNumber > 604) {
+        if (pageNumber < 1 || pageNumber > TOTAL_PAGES) {
             _uiState.update { it.copy(error = "Invalid page number: $pageNumber") }
             return
         }
 
-        _uiState.update { it.copy(isLoading = true, error = null) }
+        navigationRequested = true
+
+        // Only show the full-screen loader when there is nothing on screen
+        // yet; programmatic navigation animates the pager instead.
+        if (_uiState.value.verses.isEmpty()) {
+            _uiState.update { it.copy(isLoading = true, error = null) }
+        }
 
         viewModelScope.launch {
             try {
-                val mushafType = _uiState.value.mushafType
-                println("MushafViewModel: Loading page $pageNumber with mushafType $mushafType")
-                val verses = verseRepository.getVersesForPage(pageNumber, mushafType)
-                println("MushafViewModel: Got ${verses.size} verses for page $pageNumber")
+                val content = pageContent(pageNumber)
 
-                if (verses.isEmpty()) {
+                if (content == null) {
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -92,21 +280,13 @@ class MushafViewModel(
                     return@launch
                 }
 
-                // Get chapter info for page header
-                val chapterNumbers = verses.map { it.chapterNumber }.distinct()
-                val chapters = chapterNumbers.mapNotNull { chapterNum ->
-                    try {
-                        chapterRepository.getChapter(chapterNum)
-                    } catch (e: Exception) {
-                        null
-                    }
-                }
-
                 _uiState.update {
                     it.copy(
                         currentPage = pageNumber,
-                        verses = verses,
-                        chapters = chapters,
+                        currentChapter = content.verses.first().chapterNumber,
+                        currentVerse = content.verses.first().number,
+                        verses = content.verses,
+                        chapters = content.chapters,
                         isLoading = false,
                         error = null
                     )
@@ -114,6 +294,12 @@ class MushafViewModel(
 
                 // Update preferences
                 preferencesRepository.setCurrentPage(pageNumber)
+                schedulePositionSave()
+                beginPageTiming(
+                    pageNumber = pageNumber,
+                    chapterNumber = content.verses.first().chapterNumber,
+                    verseNumber = content.verses.first().number
+                )
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(
@@ -130,7 +316,7 @@ class MushafViewModel(
      */
     fun nextPage() {
         val nextPage = _uiState.value.currentPage + 1
-        if (nextPage <= 604) {
+        if (nextPage <= TOTAL_PAGES) {
             loadPage(nextPage)
         }
     }
@@ -149,7 +335,7 @@ class MushafViewModel(
      * Go to specific chapter
      */
     fun goToChapter(chapterNumber: Int, verseNumber: Int = 1) {
-        if (chapterNumber < 1 || chapterNumber > 114) {
+        if (chapterNumber < 1 || chapterNumber > TOTAL_CHAPTERS) {
             _uiState.update { it.copy(error = "Invalid chapter number: $chapterNumber") }
             return
         }
@@ -244,6 +430,9 @@ class MushafViewModel(
                 preferencesRepository.setMushafType(type)
                 _uiState.update { it.copy(mushafType = type) }
 
+                // Cached pages were rendered for the previous layout
+                pageCache.evictAll()
+
                 // Reload current page with new mushaf type
                 loadPage(_uiState.value.currentPage)
             } catch (e: Exception) {
@@ -259,6 +448,7 @@ class MushafViewModel(
      */
     fun updateScrollPosition(position: Float) {
         _uiState.update { it.copy(scrollPosition = position) }
+        schedulePositionSave()
     }
 
     /**
@@ -315,16 +505,18 @@ class MushafViewModel(
         val state = _uiState.value
         return PageInfo(
             pageNumber = state.currentPage,
-            totalPages = 604,
+            totalPages = TOTAL_PAGES,
             chapterName = state.chapters.firstOrNull()?.arabicTitle ?: "",
-            juzNumber = calculateJuzNumber(state.currentPage),
-            progress = (state.currentPage.toFloat() / 604 * 100).toInt()
+            // Prefer the real juz cached with the page; fall back only if it hasn't loaded.
+            juzNumber = pageCache.get(state.currentPage)?.juzNumber
+                ?: calculateJuzNumber(state.currentPage),
+            progress = (state.currentPage.toFloat() / TOTAL_PAGES * 100).toInt()
         )
     }
 
     /**
-     * Calculate Juz number from page number
-     * Each Juz is approximately 20 pages
+     * Fallback juz estimate from the page number (each juz is ~20 pages). Only used when
+     * the real juz from the page data has not loaded yet; the header uses the real value.
      */
     private fun calculateJuzNumber(pageNumber: Int): Int {
         return ((pageNumber - 1) / 20) + 1
@@ -361,3 +553,37 @@ data class PageInfo(
     val juzNumber: Int,
     val progress: Int
 )
+
+/**
+ * Verses and chapter metadata of a single mushaf page, as consumed by the
+ * pager in MushafView.
+ *
+ * @internal Not part of the public API.
+ */
+internal data class PageContent(
+    val verses: List<Verse>,
+    val chapters: List<Chapter>,
+    // Real juz number (for the deprecated page-info overlay) plus the localized juz/hizb
+    // labels read straight from the page data - Arabic and English variants, so the header
+    // can show whichever matches the app language. Hizb is null on pages where no quarter
+    // starts.
+    val juzNumber: Int,
+    val juzArabic: String,
+    val juzEnglish: String,
+    val hizbArabic: String? = null,
+    val hizbEnglish: String? = null,
+    // Surah headers starting on this page, with the normalized position of each name so
+    // the reader can draw the decorative bar behind it.
+    val chapterHeaders: List<ChapterHeader> = emptyList(),
+)
+
+internal val TOTAL_PAGES = com.mushafimad.core.utils.QuranUtils.TOTAL_PAGES
+internal val TOTAL_CHAPTERS = com.mushafimad.core.utils.QuranUtils.TOTAL_CHAPTERS
+private const val PAGE_CACHE_SIZE = 8
+private const val SAVE_POSITION_DEBOUNCE_MS = 1000L
+
+/**
+ * Below this, the reader was flicking through pages rather than reading them,
+ * so the page is not recorded as a reading session.
+ */
+private const val MIN_SESSION_SECONDS = 3

@@ -20,7 +20,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.koin.androidx.compose.koinViewModel
+import com.mushafimad.ui.internal.mushafViewModel
 import com.mushafimad.core.data.audio.PlaybackState
 import com.mushafimad.core.domain.models.ReciterInfo
 import com.mushafimad.ui.theme.MushafColors
@@ -48,10 +48,8 @@ fun QuranPlayerView(
     onNextVerse: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    val viewModel: QuranPlayerViewModel = koinViewModel()
+    val viewModel: QuranPlayerViewModel = mushafViewModel()
     val playbackState by viewModel.playbackState.collectAsState()
-    val currentTimeMs by viewModel.currentTimeMs.collectAsState()
-    val durationMs by viewModel.durationMs.collectAsState()
     val playbackRate by viewModel.playbackRate.collectAsState()
     val isRepeatEnabled by viewModel.isRepeatEnabled.collectAsState()
     val currentVerseNumber by viewModel.currentVerseNumber.collectAsState()
@@ -59,6 +57,11 @@ fun QuranPlayerView(
     val availableReciters by viewModel.availableReciters.collectAsState()
 
     var showReciterPicker by remember { mutableStateOf(false) }
+
+    val onPlayPause = remember(viewModel) { { viewModel.togglePlayback() } }
+    val onToggleRepeat = remember(viewModel) { { viewModel.toggleRepeat() } }
+    val onCyclePlaybackRate = remember(viewModel) { { viewModel.cyclePlaybackRate() } }
+    val onReciterClick = remember { { showReciterPicker = true } }
 
     // Configure player on initial load
     LaunchedEffect(chapterNumber, reciterId) {
@@ -73,7 +76,7 @@ fun QuranPlayerView(
     }
 
     // Accent color matching iOS
-    val accentColor = Color(0xFF2D7F6E)
+    val accentColor = remember { Color(0xFF2D7F6E) }
 
     Box(
         modifier = modifier
@@ -90,19 +93,15 @@ fun QuranPlayerView(
                 chapterName = chapterName,
                 currentVerseNumber = currentVerseNumber,
                 playbackState = playbackState,
-                onReciterClick = { showReciterPicker = true }
+                onReciterClick = onReciterClick
             )
 
-            // Progress bar
-            PlayerProgressBar(
-                currentTimeMs = currentTimeMs,
-                durationMs = durationMs,
+            // Container collects fast-changing flows in its own scope so that
+            // position ticks don't cause PlayerHeader or PlayerControls to recompose.
+            PlayerProgressBarContainer(
+                viewModel = viewModel,
                 accentColor = accentColor,
-                enabled = durationMs > 0 && playbackState != PlaybackState.LOADING,
-                onSeek = { progress ->
-                    val newPosition = (durationMs * progress).toLong()
-                    viewModel.seekTo(newPosition)
-                }
+                isLoading = playbackState == PlaybackState.LOADING,
             )
 
             // Control buttons
@@ -111,11 +110,11 @@ fun QuranPlayerView(
                 isRepeatEnabled = isRepeatEnabled,
                 playbackRate = playbackRate,
                 accentColor = accentColor,
-                onPlayPause = { viewModel.togglePlayback() },
+                onPlayPause = onPlayPause,
                 onPreviousVerse = onPreviousVerse,
                 onNextVerse = onNextVerse,
-                onToggleRepeat = { viewModel.toggleRepeat() },
-                onCyclePlaybackRate = { viewModel.cyclePlaybackRate() }
+                onToggleRepeat = onToggleRepeat,
+                onCyclePlaybackRate = onCyclePlaybackRate
             )
         }
     }
@@ -265,7 +264,34 @@ private fun StateRow(
 }
 
 /**
- * Progress bar with time labels
+ * Container: collects high-frequency position flows in its own recompose scope so that
+ * ~100ms position ticks only recompose this subtree, not PlayerHeader or PlayerControls.
+ */
+@Composable
+private fun PlayerProgressBarContainer(
+    viewModel: QuranPlayerViewModel,
+    accentColor: Color,
+    isLoading: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val currentTimeMs by viewModel.currentTimeMs.collectAsState()
+    val durationMs by viewModel.durationMs.collectAsState()
+
+    PlayerProgressBar(
+        currentTimeMs = currentTimeMs,
+        durationMs = durationMs,
+        accentColor = accentColor,
+        enabled = durationMs > 0 && !isLoading,
+        onSeek = { progress ->
+            val newPosition = (durationMs * progress).toLong()
+            viewModel.seekTo(newPosition)
+        },
+        modifier = modifier
+    )
+}
+
+/**
+ * Progress bar with time labels — pure composable, no ViewModel dependency.
  */
 @Composable
 private fun PlayerProgressBar(

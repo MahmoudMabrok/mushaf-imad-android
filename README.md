@@ -4,12 +4,12 @@ A Quran reader library for Android providing high-quality Mushaf page display wi
 
 [![Android](https://img.shields.io/badge/Platform-Android-green.svg)](https://android.com)
 [![API](https://img.shields.io/badge/API-24%2B-brightgreen.svg)](https://android-arsenal.com/api?level=24)
-[![Kotlin](https://img.shields.io/badge/Kotlin-1.9.25-blue.svg)](https://kotlinlang.org)
-[![Version](https://img.shields.io/badge/Version-0.1-blue.svg)](https://github.com/YahiaRagae/mushaf-imad-android/releases/tag/0.1)
+[![Kotlin](https://img.shields.io/badge/Kotlin-2.0.21-blue.svg)](https://kotlinlang.org)
+[![Version](https://img.shields.io/badge/Version-0.3.0-blue.svg)](https://github.com/YahiaRagae/mushaf-imad-android/releases/tag/0.3.0)
 [![JitPack](https://jitpack.io/v/YahiaRagae/mushaf-imad-android.svg)](https://jitpack.io/#YahiaRagae/mushaf-imad-android)
 [![Status](https://img.shields.io/badge/Status-Stable-green.svg)](https://github.com/YahiaRagae/mushaf-imad-android)
 
-> ✅ **Version 0.1:** The library is now feature-complete with background audio playback, modular architecture, and full production readiness.
+> ✅ **Version 0.2.1:** Supports 16 KB memory pages (required by Google Play for apps targeting Android 15+), and fixes a long list of bugs found during QA — including a startup crash and the loss of all saved user data on every launch. The public API is unchanged, so v0.1 code compiles as-is.
 
 ## Features
 
@@ -32,9 +32,9 @@ A Quran reader library for Android providing high-quality Mushaf page display wi
 
 - **Min SDK:** 24 (Android 7.0)
 - **Target SDK:** 35 (Android 15)
-- **Kotlin:** 1.9.25
+- **Kotlin:** 2.0.21
 - **Jetpack Compose:** BOM 2024.12.01
-- **Gradle:** 8.7.3
+- **Android Gradle Plugin:** 8.7.3 (Gradle 8.13)
 
 ---
 
@@ -59,14 +59,16 @@ Then add the dependency in your app's `build.gradle.kts`:
 **Option A: Full library (UI + Data) — recommended**
 ```kotlin
 dependencies {
-    implementation("com.github.YahiaRagae.mushaf-imad-android:mushaf-ui:0.1")
+    implementation("com.github.MahmoudMabrok.mushaf-imad-android:mushaf-ui:0.4.0")
+    // Page images (optional since 0.4.0 - or ship them in a Play asset pack, see below)
+    implementation("com.github.MahmoudMabrok.mushaf-imad-android:mushaf-images:0.4.0")
 }
 ```
 
 **Option B: Data layer only (custom UI)**
 ```kotlin
 dependencies {
-    implementation("com.github.YahiaRagae.mushaf-imad-android:mushaf-core:0.1")
+    implementation("com.github.MahmoudMabrok.mushaf-imad-android:mushaf-core:0.4.0")
 }
 ```
 
@@ -92,18 +94,12 @@ class MyApplication : Application() {
 
 ### 3. Update AndroidManifest.xml
 
+You need **two** permissions. That is the whole list:
+
 ```xml
 <manifest>
-    <!-- Required permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-
-    <!-- For background audio (Android 9+) -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
-
-    <!-- For notifications (Android 13+) -->
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:name=".MyApplication"
@@ -112,6 +108,17 @@ class MyApplication : Application() {
     </application>
 </manifest>
 ```
+
+Everything the library needs to run, the library declares for itself, and the
+manifest merger folds it into your app automatically: `WAKE_LOCK`,
+`FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MEDIA_PLAYBACK` and
+`POST_NOTIFICATIONS`. Do not add them — a library that cannot state its own
+requirements is a library you cannot trust, and if one is ever missing that is
+a bug in the library, not something for you to work around.
+
+(If your app targets Android 13+ you still need to *request* `POST_NOTIFICATIONS`
+from the user at runtime to show playback controls. Declaring it is ours;
+asking the user is yours.)
 
 ---
 
@@ -249,24 +256,29 @@ enum class MushafType {
 
 ### Available Reciters (18 total)
 
-- Abdul Basit Abdul Samad (عبد الباسط عبد الصمد)
-- Mohamed Siddiq Al-Minshawi (محمد صديق المنشاوي)
-- Mahmoud Khalil Al-Hussary (محمود خليل الحصري)
-- Mahmoud Khalil Al-Hussary - Mujawwad (محمود خليل الحصري - مجود)
-- Mishari Rashid Al-Afasy (مشاري راشد العفاسي)
-- Saad Al-Ghamdi (سعد الغامدي)
-- Maher Al-Muaiqly (ماهر المعيقلي)
-- Abdul Rahman Al-Sudais (عبد الرحمن السديس)
-- Saud Al-Shuraim (سعود الشريم)
-- Ahmed ibn Ali Al-Ajmi (أحمد بن علي العجمي)
-- Yasser Al-Dosari (ياسر الدوسري)
-- Abdullah Basfar (عبد الله بصفر)
-- Khalifa Al-Tunaiji (خليفة الطنيجي)
-- Nasser Al-Qatami (ناصر القطامي)
-- Abdullah Al-Juhani (عبد الله الجهني)
-- Bandar Baleela (بندر بليلة)
-- Muhammad Ayyub (محمد أيوب)
-- Abdullah Al-Matroud (عبد الله المطرود)
+Read from the bundled verse-timing data, so this is exactly what
+`AudioRepository.getAllReciters()` returns and what the reciter picker shows.
+
+| ID | Reciter | Rewaya |
+|----|---------|--------|
+| 1 | Ibrahim Al-Akdar (إبراهيم الأخضر) | حفص عن عاصم |
+| 5 | Ahmad Al-Ajmy (أحمد بن علي العجمي) | حفص عن عاصم |
+| 9 | Ahmad Nauina (أحمد نعينع) | حفص عن عاصم |
+| 10 | Akram Alalaqmi (أكرم العلاقمي) | حفص عن عاصم |
+| 31 | Saud Al-Shuraim (سعود الشريم) | حفص عن عاصم |
+| 32 | Sahl Yassin (سهل ياسين) | حفص عن عاصم |
+| 51 | Abdulbasit Abdulsamad (عبدالباسط عبدالصمد) | المصحف المجود |
+| 53 | Abdulbasit Abdulsamad (عبدالباسط عبدالصمد) | حفص عن عاصم |
+| 60 | Abdullah Basfer (عبدالله بصفر) | حفص عن عاصم |
+| 62 | Abdullah Al-Johany (عبدالله عواد الجهني) | حفص عن عاصم |
+| 67 | Abdulmohsen Al-Qasim (عبدالمحسن القاسم) | حفص عن عاصم |
+| 74 | Ali Alhuthaifi (علي بن عبدالرحمن الحذيفي) | حفص عن عاصم |
+| 78 | Emad Hafez (عماد زهير حافظ) | حفص عن عاصم |
+| 106 | Mohammad Al-Tablaway (محمد الطبلاوي) | حفص عن عاصم |
+| 112 | Mohammed Siddiq Al-Minshawi (محمد صديق المنشاوي) | حفص عن عاصم |
+| 118 | Mahmoud Khalil Al-Hussary (محمود خليل الحصري) | حفص عن عاصم |
+| 159 | Khalid Almohana (خالد المهنا) | حفص عن عاصم |
+| 256 | Ahmad Shaheen (أحمد خليل شاهين) | حفص عن عاصم |
 
 ### Audio Controls
 
@@ -353,7 +365,7 @@ mushaf-ui/                      # Jetpack Compose UI (depends on mushaf-core)
 ## Technology Stack
 
 - **UI:** Jetpack Compose with Material 3
-- **Database:** Realm Kotlin 1.16.0 (schema version 24)
+- **Database:** Realm Kotlin 3.0.0 (schema version 24, 16 KB page aligned)
 - **Audio:** Media3 (ExoPlayer) 1.5.0
 - **DI:** Koin 3.5.6 (lightweight runtime DI, no code generation)
 - **Async:** Kotlin Coroutines + Flow
@@ -364,13 +376,31 @@ mushaf-ui/                      # Jetpack Compose UI (depends on mushaf-core)
 
 ---
 
-## Sample App
+## App
 
-A sample app is included in the `sample/` module demonstrating all library features:
+**Just want to try it?** Every [release](https://github.com/YahiaRagae/mushaf-imad-android/releases)
+ships a ready-to-install APK. It is built against the *published* library, so the app
+you download is the same app a third party would get by depending on the coordinate
+below — which makes it the proof that the release actually works, not just a demo.
+(It is debug-signed, so Android will ask you to allow installing from an unknown source.)
 
-```bash
-./gradlew :sample:installDebug
-```
+The app is a full Quran reader — surah list, search, bookmarks, reading history,
+settings, the Mushaf reader and the audio player. Its source is the `app/` module, built
+in two product flavours against two different spellings of the same library:
+
+- **`source`** — depends on the library modules directly (`project(":mushaf-ui")`).
+  This is the day-to-day dev loop:
+  ```bash
+  ./gradlew :app:installSourceDebug
+  ```
+- **`published`** — depends on the library by its published Maven coordinate,
+  resolved from mavenLocal before a release and from JitPack after one. This is
+  the gate that proves what gets shipped actually works for a third party — use
+  it to sanity-check a release candidate, not for everyday development:
+  ```bash
+  ./gradlew :mushaf-core:publishToMavenLocal :mushaf-ui:publishToMavenLocal
+  ./gradlew :app:installPublishedDebug
+  ```
 
 ---
 
@@ -378,7 +408,10 @@ A sample app is included in the `sample/` module demonstrating all library featu
 
 ```bash
 # Build both library modules
-./gradlew assembleDebug -x lint
+./gradlew :mushaf-core:assembleDebug :mushaf-ui:assembleDebug -x lint
+
+# Build the app against the library from source
+./gradlew :app:assembleSourceDebug -x lint
 
 # Run tests
 ./gradlew testDebugUnitTest
@@ -388,8 +421,108 @@ A sample app is included in the `sample/` module demonstrating all library featu
 
 ## Project Status
 
-**Version:** 0.1
-**Status:** Published on [JitPack](https://jitpack.io/#YahiaRagae/mushaf-imad-android) — undergoing QA
+**Version:** 0.3.0
+**Status:** Published on [JitPack](https://jitpack.io/#YahiaRagae/mushaf-imad-android)
+
+---
+
+## What's new in 0.4.0 (MahmoudMabrok fork)
+
+### Page images are no longer inside `mushaf-core`
+
+The ~113 MB of line images (`quran-images/{page}/{line}.png`) moved out of the
+`mushaf-core` AAR (now ~5 MB) into an optional `mushaf-images` artifact, and line
+loading goes through a pluggable `LineImageSource`:
+
+```kotlin
+// Default - reads assets/quran-images/ from the app's AssetManager. Works with:
+//  * the optional mushaf-images artifact
+//  * a Play Asset Delivery pack with deliveryType "install-time" (merged into AssetManager)
+MushafLineImages.source = AssetLineImageSource()
+
+// fast-follow / on-demand pack, or any downloaded folder containing {page}/{line}.png
+MushafLineImages.source = FallbackLineImageSource(
+    AssetLineImageSource(),
+    FileLineImageSource(File(packLocation.assetsPath(), "quran-images")),
+)
+```
+
+Shipping the images in an install-time asset pack keeps them out of the base
+module, so regular app updates no longer re-download them.
+
+**Migration:** if you relied on the images being bundled, add the
+`mushaf-images` dependency. Nothing else changes.
+
+### Koin 4
+
+The library now builds against Koin 4.0.0 (ViewModel DSL from
+`org.koin.core.module.dsl`), matching apps on Koin 4 and avoiding R8/runtime
+`GetViewModelKt` mismatches.
+
+## What's new in 0.2.2
+
+Two crashes that only ever hit **consumers of the published library** — never the bundled
+sample app, which is why they survived every internal check. Both were found by building a
+real third-party app against `0.2.1` from JitPack.
+
+- **The app died the instant audio started.** `AudioPlaybackService` sets `WAKE_MODE_NETWORK`
+  on the player, which needs `WAKE_LOCK` — but the library never declared it, so the host
+  crashed with `SecurityException: ... android.permission.WAKE_LOCK`. It went unnoticed
+  because the bundled sample declared the permission itself. The library now declares it and
+  it is merged into the host automatically; **you do not need to add it**.
+- **Reading history always threw.** `recordReadingSession()` silently dropped its `verseNumber`
+  and `mushafType` before writing, so every row was stored with an empty mushaf type, and
+  reading one back did `MushafType.valueOf("")` and threw. This was latent until 0.2.1 — which
+  started recording sessions automatically — at which point any app displaying reading history
+  crashed on its first visit. Rows written by 0.2.1 no longer crash on upgrade.
+
+Also: corrected the reciter list in this README (it named people the library does not actually
+ship), and the Gradle/AGP versions.
+
+## What's new in 0.2.1
+
+The public API is unchanged — v0.1 code compiles as-is.
+
+### 16 KB page size ([#73](https://github.com/YahiaRagae/mushaf-imad-android/issues/73))
+
+Android 15+ devices can use 16 KB memory pages, and Google Play requires apps targeting Android 15+
+to support them. Three native libraries were still built for 4 KB pages, which forced the app into
+page-size compatibility mode and warned the user on every launch. All three are now aligned:
+Realm 3.0.0, DataStore 1.1.7, graphics-path 1.1.0.
+
+Realm 3.0.0 requires Kotlin ≥ 2.0.20, so the library is now built with **Kotlin 2.0.21**. The bundled
+`quran.realm` is unchanged and still shared with the iOS library.
+
+### Fixed
+
+- **Crash on the second launch.** The database was being deleted and recopied from assets on every
+  start, by two racing service instances (`RLM_ERR_MISMATCHED_CONFIG`).
+- **All user data was wiped on every launch.** Bookmarks, reading history and the last read position
+  lived in the file that was being deleted. They now live in a separate `userdata.realm` that is never
+  deleted.
+- **Zero-configuration setup crashed host apps that use Koin themselves.** The library called
+  `startKoin` on the global Koin context; it now runs an isolated one.
+- **Search.** Stale results could overwrite newer ones while typing, and the search box emptied itself
+  after tapping a result while the results stayed on screen.
+- **The reading position was never actually saved.**
+- **The reader never followed the recitation.** The page did not turn, and the highlight vanished as
+  soon as the recited verse was off-page — which also made the next/previous verse buttons appear dead.
+- **Seeking to the start did not return to the chapter opening.** The basmala is recited but is not a
+  numbered verse.
+- **Paging the reader restarted the chapter from its first verse.**
+- **Audio kept playing after the app was swiped out of recents.**
+- **`getSajdaVerses()` always returned an empty list.**
+- **Page turning** is now animated, with neighbouring pages preloaded
+  ([#70](https://github.com/YahiaRagae/mushaf-imad-android/issues/70)).
+- **Player state** comes from listener events instead of a 100 ms polling loop that ran forever.
+
+### Added
+
+- **Reading statistics now work** ([#75](https://github.com/YahiaRagae/mushaf-imad-android/issues/75)).
+  Nothing ever recorded a reading session, so reading time, streak and chapters-read were empty for
+  every consumer. The reader now times real dwell per page.
+
+---
 
 ### Completed Features
 - Page navigation (604 pages) with image-based Mushaf rendering
@@ -447,7 +580,7 @@ Developed with care for the Muslim community.
 
 ---
 
-**Last Updated:** February 3, 2026
-**Current Version:** v0.1
+**Last Updated:** July 2026
+**Current Version:** 0.3.0
 **Status:** Stable - Production Ready
 **Published:** [JitPack](https://jitpack.io/#YahiaRagae/mushaf-imad-android)
